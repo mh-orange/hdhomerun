@@ -20,10 +20,11 @@ func newEncoder(writer io.Writer) *encoder {
 }
 
 func (e *encoder) Write(p []byte) (int, error) {
+	n := 0
 	if e.err == nil {
-		return e.w.Write(p)
+		n, e.err = e.w.Write(p)
 	}
-	return 0, e.err
+	return n, e.err
 }
 
 func (e *encoder) encode(p *packet) {
