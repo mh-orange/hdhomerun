@@ -48,7 +48,7 @@ var (
 
 	tagNames = map[uint8]string{
 		TagDeviceType:    "Device Type",
-		TagDeviceId:      "Device Id",
+		TagDeviceId:      "Device ID",
 		TagGetSetName:    "Get/Set Name",
 		TagGetSetValue:   "Get/Set Value",
 		TagGetSetLockKey: "Get/Set Lock Key",
@@ -66,13 +66,13 @@ type packet struct {
 	tags    []tlv
 }
 
-func (p *packet) Dump() string {
+func (p *packet) dump() string {
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("  Type: %s\n", typeNames[p.pktType]))
 	buffer.WriteString(fmt.Sprintf("Length: %d\n", p.length))
 	buffer.WriteString("  Tags:\n")
 	for _, t := range p.tags {
-		buffer.WriteString(fmt.Sprintf("      %s\n", t.Dump()))
+		buffer.WriteString(fmt.Sprintf("      %s\n", t.dump()))
 	}
 	return buffer.String()
 }
@@ -87,7 +87,7 @@ func (t *tlv) String() string {
 	return string(t.value)
 }
 
-func (t *tlv) Dump() string {
+func (t *tlv) dump() string {
 	value := t.String()
 	if t.tag == TagDeviceType {
 		if bytes.Equal(t.value, DeviceTypeWildcard) {
@@ -98,8 +98,12 @@ func (t *tlv) Dump() string {
 			value = "storage"
 		}
 	} else if t.tag == TagDeviceId {
-		value = fmt.Sprintf("0x%s", hex.EncodeToString(t.value))
+		if bytes.Equal(t.value, DeviceIdWildcard) {
+			value = "*"
+		} else {
+			value = fmt.Sprintf("0x%s", hex.EncodeToString(t.value))
+		}
 	}
 
-	return fmt.Sprintf("%6d %18s: %s", t.length, tagNames[t.tag], value)
+	return fmt.Sprintf("%18s: %s", tagNames[t.tag], value)
 }
