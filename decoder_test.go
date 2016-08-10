@@ -17,7 +17,7 @@ func TestDecode(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(testPacket.p, p) {
-			t.Errorf("Packet decoding failed\nExpected:\n%s\nReceived:\n%s\n", testPacket.p.Dump(), p.Dump())
+			t.Errorf("Packet decoding failed\nExpected:\n%s\nReceived:\n%s\n", testPacket.p.dump(), p.dump())
 		}
 	}
 }

@@ -50,7 +50,9 @@ func (d *decoder) readData(p *packet) decoderState {
 	d.data = make([]byte, p.length)
 	_, d.err = d.r.Read(d.data)
 	if d.err == nil {
-		d.crc = crc32.ChecksumIEEE(d.data)
+		d.crc = crc32.Update(0, crc32.IEEETable, []byte{byte(p.pktType >> 8), byte(p.pktType)})
+		d.crc = crc32.Update(d.crc, crc32.IEEETable, []byte{byte(p.length >> 8), byte(p.length)})
+		d.crc = crc32.Update(d.crc, crc32.IEEETable, d.data)
 	}
 	return d.readCrc
 }

@@ -29,6 +29,8 @@ func (e *encoder) Write(p []byte) (int, error) {
 
 func (e *encoder) encode(p *packet) {
 	buffer := bytes.NewBuffer(make([]byte, 0))
+	binary.Write(buffer, binary.BigEndian, p.pktType)
+	binary.Write(buffer, binary.BigEndian, p.length)
 	for _, t := range p.tags {
 		buffer.Write([]byte{byte(t.tag)})
 		if t.length > 127 {
@@ -43,8 +45,6 @@ func (e *encoder) encode(p *packet) {
 	}
 
 	crc := crc32.ChecksumIEEE(buffer.Bytes())
-	binary.Write(e, binary.BigEndian, p.pktType)
-	binary.Write(e, binary.BigEndian, p.length)
 	buffer.WriteTo(e)
 	binary.Write(e, binary.LittleEndian, crc)
 }
