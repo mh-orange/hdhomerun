@@ -1,7 +1,6 @@
 package hdhomerun
 
 import (
-	"encoding/hex"
 	"testing"
 )
 
