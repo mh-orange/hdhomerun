@@ -6,7 +6,6 @@ import (
 )
 
 func TestPacketDump(t *testing.T) {
-	println("Request: \n" + hex.Dump(discoverReq.b))
 	expected := "  Type: Discover Request\n"
 	expected += "Length: 12\n"
 	expected += "  Tags:\n"
