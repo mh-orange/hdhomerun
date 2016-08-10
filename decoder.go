@@ -1,9 +1,9 @@
 package hdhomerun
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"hash/crc32"
 	"io"
 )
@@ -13,10 +13,8 @@ var (
 )
 
 type decoder struct {
-	r    io.Reader
-	data []byte
-	crc  uint32
-	err  error
+	r   io.Reader
+	err error
 }
 
 type decoderState func(*packet) decoderState
@@ -28,77 +26,60 @@ func newDecoder(reader io.Reader) *decoder {
 	return d
 }
 
+func (d *decoder) Read(b []byte) (int, error) {
+	n := 0
+	if d.err == nil {
+		n, d.err = d.r.Read(b)
+	}
+	return n, d.err
+}
+
+func (d *decoder) binaryRead(byteOrder binary.ByteOrder, data interface{}) {
+	if d.err == nil {
+		d.err = binary.Read(d, byteOrder, data)
+	}
+}
+
 func (d *decoder) decode() (p *packet, err error) {
+	incomingCrc := uint32(0)
 	p = &packet{}
-	for state := d.readPktType; state != nil && d.err == nil; {
-		state = state(p)
+
+	d.binaryRead(binary.BigEndian, &p.pktType)
+	d.binaryRead(binary.BigEndian, &p.length)
+
+	data := make([]byte, p.length)
+	d.Read(data)
+	computedCrc := crc32.Update(0, crc32.IEEETable, []byte{byte(p.pktType >> 8), byte(p.pktType)})
+	computedCrc = crc32.Update(computedCrc, crc32.IEEETable, []byte{byte(p.length >> 8), byte(p.length)})
+	computedCrc = crc32.Update(computedCrc, crc32.IEEETable, data)
+
+	d.binaryRead(binary.LittleEndian, &incomingCrc)
+	if d.err == nil && incomingCrc != computedCrc {
+		d.err = ErrCrc
 	}
-	return
-}
 
-func (d *decoder) readPktType(p *packet) decoderState {
-	d.err = binary.Read(d.r, binary.BigEndian, &p.pktType)
-	return d.readLength
-}
-
-func (d *decoder) readLength(p *packet) decoderState {
-	d.err = binary.Read(d.r, binary.BigEndian, &p.length)
-	return d.readData
-}
-
-func (d *decoder) readData(p *packet) decoderState {
-	d.data = make([]byte, p.length)
-	_, d.err = d.r.Read(d.data)
-	if d.err == nil {
-		d.crc = crc32.Update(0, crc32.IEEETable, []byte{byte(p.pktType >> 8), byte(p.pktType)})
-		d.crc = crc32.Update(d.crc, crc32.IEEETable, []byte{byte(p.length >> 8), byte(p.length)})
-		d.crc = crc32.Update(d.crc, crc32.IEEETable, d.data)
-	}
-	return d.readCrc
-}
-
-func (d *decoder) readCrc(p *packet) decoderState {
-	crc := uint32(0)
-	d.err = binary.Read(d.r, binary.LittleEndian, &crc)
-	if d.err == nil {
-		if d.crc != crc {
-			d.err = ErrCrc
-		}
-	}
-	return d.parseTags
-}
-
-func (d *decoder) parseTags(p *packet) decoderState {
-	for len(d.data) > 0 {
+	buffer := bytes.NewReader(data)
+	d.r = buffer
+	for d.err == nil && buffer.Len() > 0 {
 		t := tlv{}
-		if len(d.data) < 2 {
-			d.err = fmt.Errorf("Failed to parse tag: missing tag or length")
-			return nil
-		}
+		var lsb, msb uint8
 
-		t.tag = uint8(d.data[0])
-		d.data = d.data[1:]
+		d.binaryRead(binary.BigEndian, &t.tag)
+		d.binaryRead(binary.BigEndian, &lsb)
+
 		// two byte length
-		if d.data[0]&0x80 == 0x80 {
-			if len(d.data) < 1 {
-				d.err = fmt.Errorf("Failed to parse tag: varlen length but no high order byte")
-				return nil
-			}
-
-			t.length = uint16(d.data[0] & 0x7f)
-			d.data = d.data[1:]
-			t.length |= uint16(d.data[0]) << 7
+		if lsb&0x80 == 0x80 {
+			d.binaryRead(binary.BigEndian, &msb)
+			t.length = uint16(lsb&0x7f) | uint16(msb)<<7
 		} else {
-			t.length = uint16(d.data[0])
+			t.length = uint16(lsb)
 		}
-		d.data = d.data[1:]
-		if len(d.data) < int(t.length) {
-			d.err = fmt.Errorf("Failed to parse tag: remaining data less than tag length")
-			return nil
+
+		t.value = make([]byte, t.length)
+		d.Read(t.value)
+		if d.err == nil {
+			p.tags = append(p.tags, t)
 		}
-		t.value = d.data[0:t.length]
-		d.data = d.data[t.length:]
-		p.tags = append(p.tags, t)
 	}
-	return nil
+	return p, d.err
 }

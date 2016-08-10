@@ -6,18 +6,30 @@ import (
 	"testing"
 )
 
+func decode(b []byte) (*packet, error) {
+	buffer := bytes.NewBuffer(b)
+	d := newDecoder(buffer)
+	return d.decode()
+}
+
 func TestDecode(t *testing.T) {
 	for _, testPacket := range testPackets {
-		buffer := bytes.NewBuffer([]byte{})
-		buffer.Write(testPacket.b)
-		d := newDecoder(buffer)
-		p, err := d.decode()
+		p, err := decode(testPacket.b)
 		if err != nil {
 			t.Errorf("Packet decoding failed with error: %v", err)
 		}
 
 		if !reflect.DeepEqual(testPacket.p, p) {
 			t.Errorf("Packet decoding failed\nExpected:\n%s\nReceived:\n%s\n", testPacket.p.dump(), p.dump())
+		}
+
+		// fiddle with the crc to generate an error
+		b := make([]byte, len(testPacket.b))
+		copy(b, testPacket.b)
+		b[len(b)-1] = ^b[len(b)-1]
+		p, err = decode(b)
+		if err != ErrCrc {
+			t.Errorf("Expected error %v but got %v", ErrCrc, err)
 		}
 	}
 }
