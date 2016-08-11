@@ -17,8 +17,6 @@ type decoder struct {
 	err error
 }
 
-type decoderState func(*packet) decoderState
-
 func newDecoder(reader io.Reader) *decoder {
 	d := &decoder{
 		r: reader,
