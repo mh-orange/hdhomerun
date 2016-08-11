@@ -76,31 +76,31 @@ func (p *Packet) Dump() string {
 }
 
 type Tag struct {
-	tag   uint8
-	value []byte
+	Tag   uint8
+	Value []byte
 }
 
 func (t *Tag) String() string {
-	return string(t.value)
+	return string(t.Value)
 }
 
 func (t *Tag) Dump() string {
 	value := t.String()
-	if t.tag == TagDeviceType {
-		if bytes.Equal(t.value, DeviceTypeWildcard) {
+	if t.Tag == TagDeviceType {
+		if bytes.Equal(t.Value, DeviceTypeWildcard) {
 			value = "*"
-		} else if bytes.Equal(t.value, DeviceTypeTuner) {
+		} else if bytes.Equal(t.Value, DeviceTypeTuner) {
 			value = "tuner"
-		} else if bytes.Equal(t.value, DeviceTypeStorage) {
+		} else if bytes.Equal(t.Value, DeviceTypeStorage) {
 			value = "storage"
 		}
-	} else if t.tag == TagDeviceId {
-		if bytes.Equal(t.value, DeviceIdWildcard) {
+	} else if t.Tag == TagDeviceId {
+		if bytes.Equal(t.Value, DeviceIdWildcard) {
 			value = "*"
 		} else {
-			value = fmt.Sprintf("0x%s", hex.EncodeToString(t.value))
+			value = fmt.Sprintf("0x%s", hex.EncodeToString(t.Value))
 		}
 	}
 
-	return fmt.Sprintf("%18s: %s", tagNames[t.tag], value)
+	return fmt.Sprintf("%18s: %s", tagNames[t.Tag], value)
 }

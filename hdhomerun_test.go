@@ -11,12 +11,12 @@ var discoverReq = testPacket{
 		Type: TypeDiscoverReq,
 		Tags: []Tag{
 			Tag{
-				tag:   TagDeviceType,
-				value: DeviceTypeTuner,
+				Tag:   TagDeviceType,
+				Value: DeviceTypeTuner,
 			},
 			Tag{
-				tag:   TagDeviceId,
-				value: DeviceIdWildcard,
+				Tag:   TagDeviceId,
+				Value: DeviceIdWildcard,
 			},
 		},
 	},
@@ -34,12 +34,12 @@ var discoverRpy = testPacket{
 		Type: TypeDiscoverRpy,
 		Tags: []Tag{
 			Tag{
-				tag:   TagDeviceType,
-				value: DeviceTypeTuner,
+				Tag:   TagDeviceType,
+				Value: DeviceTypeTuner,
 			},
 			Tag{
-				tag:   TagDeviceId,
-				value: []byte{0x01, 0x02, 0x03, 0x04},
+				Tag:   TagDeviceId,
+				Value: []byte{0x01, 0x02, 0x03, 0x04},
 			},
 		},
 	},

@@ -71,7 +71,7 @@ func (d *Decoder) Decode() (p *Packet, err error) {
 		t := Tag{}
 		var lsb, msb uint8
 
-		d.binaryRead(binary.BigEndian, &t.tag)
+		d.binaryRead(binary.BigEndian, &t.Tag)
 		d.binaryRead(binary.BigEndian, &lsb)
 
 		// two byte length
@@ -82,8 +82,8 @@ func (d *Decoder) Decode() (p *Packet, err error) {
 			tagLength = uint16(lsb)
 		}
 
-		t.value = make([]byte, tagLength)
-		d.Read(t.value)
+		t.Value = make([]byte, tagLength)
+		d.Read(t.Value)
 		if d.err == nil {
 			p.Tags = append(p.Tags, t)
 		}

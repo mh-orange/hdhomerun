@@ -23,22 +23,22 @@ func TestTlvDumpDeviceType(t *testing.T) {
 		{
 			expected: "       Device Type: *",
 			tag: Tag{
-				tag:   TagDeviceType,
-				value: DeviceTypeWildcard,
+				Tag:   TagDeviceType,
+				Value: DeviceTypeWildcard,
 			},
 		},
 		{
 			expected: "       Device Type: tuner",
 			tag: Tag{
-				tag:   TagDeviceType,
-				value: DeviceTypeTuner,
+				Tag:   TagDeviceType,
+				Value: DeviceTypeTuner,
 			},
 		},
 		{
 			expected: "       Device Type: storage",
 			tag: Tag{
-				tag:   TagDeviceType,
-				value: DeviceTypeStorage,
+				Tag:   TagDeviceType,
+				Value: DeviceTypeStorage,
 			},
 		},
 	}
