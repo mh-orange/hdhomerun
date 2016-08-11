@@ -1,25 +1,22 @@
 package hdhomerun
 
 type testPacket struct {
-	p *packet
+	p *Packet
 	b []byte
 }
 
 // Discover Request
 var discoverReq = testPacket{
-	p: &packet{
-		pktType: TypeDiscoverReq,
-		length:  0x0c,
-		tags: []tlv{
-			tlv{
-				tag:    TagDeviceType,
-				length: 0x04,
-				value:  DeviceTypeTuner,
+	p: &Packet{
+		Type: TypeDiscoverReq,
+		Tags: []Tag{
+			Tag{
+				tag:   TagDeviceType,
+				value: DeviceTypeTuner,
 			},
-			tlv{
-				tag:    TagDeviceId,
-				length: 0x04,
-				value:  DeviceIdWildcard,
+			Tag{
+				tag:   TagDeviceId,
+				value: DeviceIdWildcard,
 			},
 		},
 	},
@@ -33,19 +30,16 @@ var discoverReq = testPacket{
 
 // Discover Reply
 var discoverRpy = testPacket{
-	p: &packet{
-		pktType: TypeDiscoverRpy,
-		length:  0x0c,
-		tags: []tlv{
-			tlv{
-				tag:    TagDeviceType,
-				length: 0x04,
-				value:  DeviceTypeTuner,
+	p: &Packet{
+		Type: TypeDiscoverRpy,
+		Tags: []Tag{
+			Tag{
+				tag:   TagDeviceType,
+				value: DeviceTypeTuner,
 			},
-			tlv{
-				tag:    TagDeviceId,
-				length: 0x04,
-				value:  []byte{0x01, 0x02, 0x03, 0x04},
+			Tag{
+				tag:   TagDeviceId,
+				value: []byte{0x01, 0x02, 0x03, 0x04},
 			},
 		},
 	},
@@ -56,6 +50,11 @@ var discoverRpy = testPacket{
 		0x47, 0xc5,
 	},
 }
+
+var getRequest = testPacket{}
+var getReply = testPacket{}
+var setRequest = testPacket{}
+var setReply = testPacket{}
 
 var testPackets = []testPacket{
 	discoverReq,

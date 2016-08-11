@@ -8,16 +8,16 @@ import (
 type Device struct {
 	c   net.Conn
 	err error
-	e   *encoder
-	d   *decoder
+	e   *Encoder
+	d   *Decoder
 }
 
 func Connect(id, ip string, port uint16) *Device {
 	d := &Device{}
 
 	d.c, d.err = net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
-	d.e = newEncoder(d.c)
-	d.d = newDecoder(d.c)
+	d.e = NewEncoder(d.c)
+	d.d = NewDecoder(d.c)
 
 	return d
 }

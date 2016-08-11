@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-func decode(b []byte) (*packet, error) {
+func decode(b []byte) (*Packet, error) {
 	buffer := bytes.NewBuffer(b)
-	d := newDecoder(buffer)
-	return d.decode()
+	d := NewDecoder(buffer)
+	return d.Decode()
 }
 
 func TestDecode(t *testing.T) {
@@ -20,7 +20,7 @@ func TestDecode(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(testPacket.p, p) {
-			t.Errorf("Packet decoding failed\nExpected:\n%s\nReceived:\n%s\n", testPacket.p.dump(), p.dump())
+			t.Errorf("Packet decoding failed\nExpected:\n%s\nReceived:\n%s\n", testPacket.p.Dump(), p.Dump())
 		}
 
 		// fiddle with the crc to generate an error

@@ -60,34 +60,31 @@ var (
 	}
 )
 
-type packet struct {
-	pktType uint16
-	length  uint16
-	tags    []tlv
+type Packet struct {
+	Type uint16
+	Tags []Tag
 }
 
-func (p *packet) dump() string {
+func (p *Packet) Dump() string {
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("  Type: %s\n", typeNames[p.pktType]))
-	buffer.WriteString(fmt.Sprintf("Length: %d\n", p.length))
+	buffer.WriteString(fmt.Sprintf("  Type: %s\n", typeNames[p.Type]))
 	buffer.WriteString("  Tags:\n")
-	for _, t := range p.tags {
-		buffer.WriteString(fmt.Sprintf("      %s\n", t.dump()))
+	for _, t := range p.Tags {
+		buffer.WriteString(fmt.Sprintf("      %s\n", t.Dump()))
 	}
 	return buffer.String()
 }
 
-type tlv struct {
-	tag    uint8
-	length uint16
-	value  []byte
+type Tag struct {
+	tag   uint8
+	value []byte
 }
 
-func (t *tlv) String() string {
+func (t *Tag) String() string {
 	return string(t.value)
 }
 
-func (t *tlv) dump() string {
+func (t *Tag) Dump() string {
 	value := t.String()
 	if t.tag == TagDeviceType {
 		if bytes.Equal(t.value, DeviceTypeWildcard) {

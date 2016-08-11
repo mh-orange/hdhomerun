@@ -7,19 +7,19 @@ import (
 	"io"
 )
 
-type encoder struct {
+type Encoder struct {
 	w   io.Writer
 	err error
 }
 
-func newEncoder(writer io.Writer) *encoder {
-	e := &encoder{
+func NewEncoder(writer io.Writer) *Encoder {
+	e := &Encoder{
 		w: writer,
 	}
 	return e
 }
 
-func (e *encoder) Write(p []byte) (int, error) {
+func (e *Encoder) Write(p []byte) (int, error) {
 	n := 0
 	if e.err == nil {
 		n, e.err = e.w.Write(p)
@@ -27,18 +27,27 @@ func (e *encoder) Write(p []byte) (int, error) {
 	return n, e.err
 }
 
-func (e *encoder) encode(p *packet) {
+func (e *Encoder) Encode(p *Packet) {
 	buffer := bytes.NewBuffer(make([]byte, 0))
-	binary.Write(buffer, binary.BigEndian, p.pktType)
-	binary.Write(buffer, binary.BigEndian, p.length)
-	for _, t := range p.tags {
+	length := uint16(0)
+	for _, tag := range p.Tags {
+		length += 2 + uint16(len(tag.value))
+		if len(tag.value) > 127 {
+			length += 1
+		}
+	}
+
+	binary.Write(buffer, binary.BigEndian, p.Type)
+	binary.Write(buffer, binary.BigEndian, length)
+	for _, t := range p.Tags {
 		buffer.Write([]byte{byte(t.tag)})
-		if t.length > 127 {
-			lsb := 0x80 | (t.length & 0x00ff)
-			msb := t.length >> 7
+		length := uint8(len(t.value))
+		if length > 127 {
+			lsb := 0x80 | (length & 0x00ff)
+			msb := length >> 7
 			buffer.Write([]byte{byte(lsb), byte(msb)})
 		} else {
-			buffer.Write([]byte{byte(t.length)})
+			buffer.Write([]byte{byte(length)})
 		}
 
 		buffer.Write(t.value)
