@@ -8,7 +8,6 @@ import (
 	"hash/crc32"
 	"io"
 	"os"
-	"runtime/debug"
 )
 
 var (
@@ -41,10 +40,6 @@ func (pd *packetDecoder) Read(b []byte) (int, error) {
 	n := 0
 	if pd.err == nil {
 		n, pd.err = pd.r.Read(b)
-		if pd.err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read: %v", pd.err)
-			debug.PrintStack()
-		}
 	}
 	return n, pd.err
 }
