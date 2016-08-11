@@ -16,77 +16,87 @@ var (
 )
 
 type Decoder struct {
+	r io.Reader
+}
+
+func NewDecoder(reader io.Reader) *Decoder {
+	return &Decoder{
+		r: reader,
+	}
+}
+
+func (d *Decoder) Next() (*Packet, error) {
+	pd := &packetDecoder{
+		r: d.r,
+	}
+	return pd.decode()
+}
+
+type packetDecoder struct {
 	r   io.Reader
 	err error
 }
 
-func NewDecoder(reader io.Reader) *Decoder {
-	d := &Decoder{
-		r: reader,
-	}
-	return d
-}
-
-func (d *Decoder) Read(b []byte) (int, error) {
+func (pd *packetDecoder) Read(b []byte) (int, error) {
 	n := 0
-	if d.err == nil {
-		n, d.err = d.r.Read(b)
-		if d.err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read: %v", d.err)
+	if pd.err == nil {
+		n, pd.err = pd.r.Read(b)
+		if pd.err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to read: %v", pd.err)
 			debug.PrintStack()
 		}
 	}
-	return n, d.err
+	return n, pd.err
 }
 
-func (d *Decoder) binaryRead(byteOrder binary.ByteOrder, data interface{}) {
-	if d.err == nil {
-		d.err = binary.Read(d, byteOrder, data)
+func (pd *packetDecoder) binaryRead(byteOrder binary.ByteOrder, data interface{}) {
+	if pd.err == nil {
+		pd.err = binary.Read(pd, byteOrder, data)
 	}
 }
 
-func (d *Decoder) Decode() (p *Packet, err error) {
+func (pd *packetDecoder) decode() (p *Packet, err error) {
 	incomingCrc := uint32(0)
 	length := uint16(0)
 	p = &Packet{}
 
-	d.binaryRead(binary.BigEndian, &p.Type)
-	d.binaryRead(binary.BigEndian, &length)
+	pd.binaryRead(binary.BigEndian, &p.Type)
+	pd.binaryRead(binary.BigEndian, &length)
 
 	data := make([]byte, length)
-	d.Read(data)
+	pd.Read(data)
 	computedCrc := crc32.Update(0, crc32.IEEETable, []byte{byte(p.Type >> 8), byte(p.Type)})
 	computedCrc = crc32.Update(computedCrc, crc32.IEEETable, []byte{byte(length >> 8), byte(length)})
 	computedCrc = crc32.Update(computedCrc, crc32.IEEETable, data)
 
-	d.binaryRead(binary.LittleEndian, &incomingCrc)
-	if d.err == nil && incomingCrc != computedCrc {
-		d.err = ErrCrc
+	pd.binaryRead(binary.LittleEndian, &incomingCrc)
+	if pd.err == nil && incomingCrc != computedCrc {
+		pd.err = ErrCrc
 	}
 
 	var tagLength uint16
 	buffer := bytes.NewReader(data)
-	d.r = buffer
-	for d.err == nil && buffer.Len() > 0 {
+	pd.r = buffer
+	for pd.err == nil && buffer.Len() > 0 {
 		t := Tag{}
 		var lsb, msb uint8
 
-		d.binaryRead(binary.BigEndian, &t.Tag)
-		d.binaryRead(binary.BigEndian, &lsb)
+		pd.binaryRead(binary.BigEndian, &t.Tag)
+		pd.binaryRead(binary.BigEndian, &lsb)
 
 		// two byte length
 		if lsb&0x80 == 0x80 {
-			d.binaryRead(binary.BigEndian, &msb)
+			pd.binaryRead(binary.BigEndian, &msb)
 			tagLength = uint16(lsb&0x7f) | uint16(msb)<<7
 		} else {
 			tagLength = uint16(lsb)
 		}
 
 		t.Value = make([]byte, tagLength)
-		d.Read(t.Value)
-		if d.err == nil {
+		pd.Read(t.Value)
+		if pd.err == nil {
 			p.Tags = append(p.Tags, t)
 		}
 	}
-	return p, d.err
+	return p, pd.err
 }

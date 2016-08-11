@@ -9,7 +9,7 @@ import (
 func decode(b []byte) (*Packet, error) {
 	buffer := bytes.NewBuffer(b)
 	d := NewDecoder(buffer)
-	return d.Decode()
+	return d.Next()
 }
 
 func TestDecode(t *testing.T) {

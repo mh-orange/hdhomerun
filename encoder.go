@@ -27,7 +27,7 @@ func (e *Encoder) Write(p []byte) (int, error) {
 	return n, e.err
 }
 
-func (e *Encoder) Encode(p *Packet) {
+func (e *Encoder) Encode(p *Packet) error {
 	buffer := bytes.NewBuffer(make([]byte, 0))
 	length := uint16(0)
 	for _, tag := range p.Tags {
@@ -54,6 +54,7 @@ func (e *Encoder) Encode(p *Packet) {
 	}
 
 	crc := crc32.ChecksumIEEE(buffer.Bytes())
+	binary.Write(buffer, binary.LittleEndian, crc)
 	buffer.WriteTo(e)
-	binary.Write(e, binary.LittleEndian, crc)
+	return e.err
 }
