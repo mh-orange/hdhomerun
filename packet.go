@@ -16,58 +16,47 @@ var (
 	DeviceIdWildcard   []byte = []byte{0xFF, 0xFF, 0xFF, 0xFF}
 )
 
+type PacketType uint16
+
 const (
-	TypeDiscoverReq uint16 = 0x0002
-	TypeDiscoverRpy uint16 = 0x0003
-	TypeGetSetReq   uint16 = 0x0004
-	TypeGetSetRpy   uint16 = 0x0005
-	TypeUpgradeReq  uint16 = 0x0006
-	TypeUpgradeRpy  uint16 = 0x0007
-
-	TagDeviceType    uint8 = 0x01
-	TagDeviceId      uint8 = 0x02
-	TagGetSetName    uint8 = 0x03
-	TagGetSetValue   uint8 = 0x04
-	TagGetSetLockKey uint8 = 0x15
-	TagErrorMsg      uint8 = 0x05
-	TagTunerCount    uint8 = 0x10
-	TagDeviceAuthBin uint8 = 0x29
-	TagBaseUrl       uint8 = 0x2A
-	TagDeviceAuthStr uint8 = 0x2B
+	TypeDiscoverReq PacketType = 0x0002
+	TypeDiscoverRpy PacketType = 0x0003
+	TypeGetSetReq   PacketType = 0x0004
+	TypeGetSetRpy   PacketType = 0x0005
+	TypeUpgradeReq  PacketType = 0x0006
+	TypeUpgradeRpy  PacketType = 0x0007
 )
 
-var (
-	typeNames = map[uint16]string{
-		TypeDiscoverReq: "Discover Request",
-		TypeDiscoverRpy: "Discover Reply",
-		TypeGetSetReq:   "Get/Set Request",
-		TypeGetSetRpy:   "Get/Set Reply",
-		TypeUpgradeReq:  "Upgrade Request",
-		TypeUpgradeRpy:  "Upgrade Reply",
+func (pt PacketType) String() string {
+	switch pt {
+	case TypeDiscoverReq:
+		return "Discover Request"
+	case TypeDiscoverRpy:
+		return "Discover Reply"
+	case TypeGetSetReq:
+		return "Get/Set Request"
+	case TypeGetSetRpy:
+		return "Get/Set Reply"
+	case TypeUpgradeReq:
+		return "Upgrade Request"
+	case TypeUpgradeRpy:
+		return "Upgrade Reply"
 	}
 
-	tagNames = map[uint8]string{
-		TagDeviceType:    "Device Type",
-		TagDeviceId:      "Device ID",
-		TagGetSetName:    "Get/Set Name",
-		TagGetSetValue:   "Get/Set Value",
-		TagGetSetLockKey: "Get/Set Lock Key",
-		TagErrorMsg:      "Error Msg",
-		TagTunerCount:    "Tuner Count",
-		TagDeviceAuthBin: "Device Auth Bin",
-		TagBaseUrl:       "Base URL",
-		TagDeviceAuthStr: "Device Auth String",
-	}
-)
+	return "Unknown"
+}
 
 type Packet struct {
-	Type uint16
+	Type PacketType
 	Tags []Tag
 }
 
+//func NewPacket(t PacketType, tags map[TagType]TagValue) *Packet {
+//}
+
 func (p *Packet) Dump() string {
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("  Type: %s\n", typeNames[p.Type]))
+	buffer.WriteString(fmt.Sprintf("  Type: %s\n", p.Type))
 	buffer.WriteString("  Tags:\n")
 	for _, t := range p.Tags {
 		buffer.WriteString(fmt.Sprintf("      %s\n", t.Dump()))
@@ -75,12 +64,60 @@ func (p *Packet) Dump() string {
 	return buffer.String()
 }
 
-type Tag struct {
-	Tag   uint8
-	Value []byte
+type TagType uint8
+
+const (
+	TagDeviceType    TagType = 0x01
+	TagDeviceId      TagType = 0x02
+	TagGetSetName    TagType = 0x03
+	TagGetSetValue   TagType = 0x04
+	TagGetSetLockKey TagType = 0x15
+	TagErrorMsg      TagType = 0x05
+	TagTunerCount    TagType = 0x10
+	TagDeviceAuthBin TagType = 0x29
+	TagBaseUrl       TagType = 0x2A
+	TagDeviceAuthStr TagType = 0x2B
+)
+
+func (tt TagType) String() string {
+	switch tt {
+	case TagDeviceType:
+		return "Device Type"
+	case TagDeviceId:
+		return "Device ID"
+	case TagGetSetName:
+		return "Get/Set Name"
+	case TagGetSetValue:
+		return "Get/Set Value"
+	case TagGetSetLockKey:
+		return "Get/Set Lock Key"
+	case TagErrorMsg:
+		return "Error Msg"
+	case TagTunerCount:
+		return "Tuner Count"
+	case TagDeviceAuthBin:
+		return "Device Auth Bin"
+	case TagBaseUrl:
+		return "Base URL"
+	case TagDeviceAuthStr:
+		return "Device Auth String"
+	}
+
+	return "Unknown"
 }
 
-func (t *Tag) String() string {
+type TagValue []byte
+
+func (tv TagValue) String() string {
+	return string(tv)
+}
+
+type Tag struct {
+	Tag   TagType
+	Value TagValue
+}
+
+func (t Tag) String() string {
 	return string(t.Value)
 }
 
@@ -102,5 +139,5 @@ func (t *Tag) Dump() string {
 		}
 	}
 
-	return fmt.Sprintf("%18s: %s", tagNames[t.Tag], value)
+	return fmt.Sprintf("%18s: %s", t.Tag, value)
 }
