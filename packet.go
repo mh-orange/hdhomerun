@@ -51,8 +51,19 @@ type Packet struct {
 	Tags []Tag
 }
 
-//func NewPacket(t PacketType, tags map[TagType]TagValue) *Packet {
-//}
+func NewPacket(t PacketType, tags map[TagType]TagValue) *Packet {
+	p := &Packet{
+		Type: t,
+	}
+
+	for t, v := range tags {
+		p.Tags = append(p.Tags, Tag{
+			Type:  t,
+			Value: v,
+		})
+	}
+	return p
+}
 
 func (p *Packet) Dump() string {
 	var buffer bytes.Buffer
@@ -113,7 +124,7 @@ func (tv TagValue) String() string {
 }
 
 type Tag struct {
-	Tag   TagType
+	Type  TagType
 	Value TagValue
 }
 
@@ -123,7 +134,7 @@ func (t Tag) String() string {
 
 func (t *Tag) Dump() string {
 	value := t.String()
-	if t.Tag == TagDeviceType {
+	if t.Type == TagDeviceType {
 		if bytes.Equal(t.Value, DeviceTypeWildcard) {
 			value = "*"
 		} else if bytes.Equal(t.Value, DeviceTypeTuner) {
@@ -131,7 +142,7 @@ func (t *Tag) Dump() string {
 		} else if bytes.Equal(t.Value, DeviceTypeStorage) {
 			value = "storage"
 		}
-	} else if t.Tag == TagDeviceId {
+	} else if t.Type == TagDeviceId {
 		if bytes.Equal(t.Value, DeviceIdWildcard) {
 			value = "*"
 		} else {
@@ -139,5 +150,5 @@ func (t *Tag) Dump() string {
 		}
 	}
 
-	return fmt.Sprintf("%18s: %s", t.Tag, value)
+	return fmt.Sprintf("%18s: %s", t.Type, value)
 }

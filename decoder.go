@@ -74,7 +74,7 @@ func (pd *packetDecoder) decode() (p *Packet, err error) {
 		t := Tag{}
 		var lsb, msb uint8
 
-		pd.binaryRead(binary.BigEndian, &t.Tag)
+		pd.binaryRead(binary.BigEndian, &t.Type)
 		pd.binaryRead(binary.BigEndian, &lsb)
 
 		// two byte length

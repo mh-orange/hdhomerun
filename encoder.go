@@ -40,7 +40,7 @@ func (e *Encoder) Encode(p *Packet) error {
 	binary.Write(buffer, binary.BigEndian, p.Type)
 	binary.Write(buffer, binary.BigEndian, length)
 	for _, t := range p.Tags {
-		buffer.Write([]byte{byte(t.Tag)})
+		buffer.Write([]byte{byte(t.Type)})
 		length := uint8(len(t.Value))
 		if length > 127 {
 			lsb := 0x80 | (length & 0x00ff)
