@@ -51,7 +51,9 @@ func (pd *packetDecoder) binaryRead(byteOrder binary.ByteOrder, data interface{}
 func (pd *packetDecoder) decode() (p *Packet, err error) {
 	incomingCrc := uint32(0)
 	length := uint16(0)
-	p = &Packet{}
+	p = &Packet{
+		Tags: make(map[TagType]Tag),
+	}
 
 	pd.binaryRead(binary.BigEndian, &p.Type)
 	pd.binaryRead(binary.BigEndian, &length)
@@ -88,7 +90,7 @@ func (pd *packetDecoder) decode() (p *Packet, err error) {
 		t.Value = make([]byte, tagLength)
 		pd.Read(t.Value)
 		if pd.err == nil {
-			p.Tags = append(p.Tags, t)
+			p.Tags[t.Type] = t
 		}
 	}
 	return p, pd.err

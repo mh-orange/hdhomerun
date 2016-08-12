@@ -39,7 +39,9 @@ func (e *Encoder) Encode(p *Packet) error {
 
 	binary.Write(buffer, binary.BigEndian, p.Type)
 	binary.Write(buffer, binary.BigEndian, length)
-	for _, t := range p.Tags {
+
+	/* Order the tags deterministically */
+	p.Tags.Iterate(func(t Tag) {
 		buffer.Write([]byte{byte(t.Type)})
 		length := uint8(len(t.Value))
 		if length > 127 {
@@ -51,7 +53,7 @@ func (e *Encoder) Encode(p *Packet) error {
 		}
 
 		buffer.Write(t.Value)
-	}
+	})
 
 	crc := crc32.ChecksumIEEE(buffer.Bytes())
 	binary.Write(buffer, binary.LittleEndian, crc)

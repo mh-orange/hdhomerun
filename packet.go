@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"sort"
 )
 
 var (
@@ -48,19 +49,20 @@ func (pt PacketType) String() string {
 
 type Packet struct {
 	Type PacketType
-	Tags []Tag
+	Tags TagsMap
 }
 
 func NewPacket(t PacketType, tags map[TagType]TagValue) *Packet {
 	p := &Packet{
 		Type: t,
+		Tags: make(map[TagType]Tag),
 	}
 
 	for t, v := range tags {
-		p.Tags = append(p.Tags, Tag{
+		p.Tags[t] = Tag{
 			Type:  t,
 			Value: v,
-		})
+		}
 	}
 	return p
 }
@@ -69,9 +71,9 @@ func (p *Packet) Dump() string {
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("  Type: %s\n", p.Type))
 	buffer.WriteString("  Tags:\n")
-	for _, t := range p.Tags {
+	p.Tags.Iterate(func(t Tag) {
 		buffer.WriteString(fmt.Sprintf("      %s\n", t.Dump()))
-	}
+	})
 	return buffer.String()
 }
 
@@ -132,7 +134,7 @@ func (t Tag) String() string {
 	return string(t.Value)
 }
 
-func (t *Tag) Dump() string {
+func (t Tag) Dump() string {
 	value := t.String()
 	if t.Type == TagDeviceType {
 		if bytes.Equal(t.Value, DeviceTypeWildcard) {
@@ -151,4 +153,18 @@ func (t *Tag) Dump() string {
 	}
 
 	return fmt.Sprintf("%18s: %s", t.Type, value)
+}
+
+type TagsMap map[TagType]Tag
+
+func (tm TagsMap) Iterate(callback func(Tag)) {
+	var keys []int
+	for tt, _ := range tm {
+		keys = append(keys, int(tt))
+	}
+
+	sort.Ints(keys)
+	for _, tt := range keys {
+		callback(tm[TagType(tt)])
+	}
 }

@@ -52,7 +52,7 @@ func TestTlvDumpDeviceType(t *testing.T) {
 
 func TestTlvDumpDeviceId(t *testing.T) {
 	expected := "         Device ID: 0x01020304"
-	received := discoverRpy.p.Tags[1].Dump()
+	received := discoverRpy.p.Tags[TagDeviceId].Dump()
 	if received != expected {
 		t.Errorf("Unexpected output:\nExpected: \"%s\"\n     Got: \"%s\"", expected, received)
 	}

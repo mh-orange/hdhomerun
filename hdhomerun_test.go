@@ -7,19 +7,10 @@ type testPacket struct {
 
 // Discover Request
 var discoverReq = testPacket{
-	p: &Packet{
-		Type: TypeDiscoverReq,
-		Tags: []Tag{
-			Tag{
-				Tag:   TagDeviceType,
-				Value: DeviceTypeTuner,
-			},
-			Tag{
-				Tag:   TagDeviceId,
-				Value: DeviceIdWildcard,
-			},
-		},
-	},
+	p: NewPacket(TypeDiscoverReq, map[TagType]TagValue{
+		TagDeviceType: DeviceTypeTuner,
+		TagDeviceId:   DeviceIdWildcard,
+	}),
 	b: []byte{
 		0x00, 0x02, 0x00, 0x0c, 0x01, 0x04,
 		0x00, 0x00, 0x00, 0x01, 0x02, 0x04,
@@ -30,19 +21,10 @@ var discoverReq = testPacket{
 
 // Discover Reply
 var discoverRpy = testPacket{
-	p: &Packet{
-		Type: TypeDiscoverRpy,
-		Tags: []Tag{
-			Tag{
-				Tag:   TagDeviceType,
-				Value: DeviceTypeTuner,
-			},
-			Tag{
-				Tag:   TagDeviceId,
-				Value: []byte{0x01, 0x02, 0x03, 0x04},
-			},
-		},
-	},
+	p: NewPacket(TypeDiscoverRpy, map[TagType]TagValue{
+		TagDeviceType: DeviceTypeTuner,
+		TagDeviceId:   TagValue{0x01, 0x02, 0x03, 0x04},
+	}),
 	b: []byte{
 		0x00, 0x03, 0x00, 0x0c, 0x01, 0x04,
 		0x00, 0x00, 0x00, 0x01, 0x02, 0x04,
