@@ -8,9 +8,6 @@ import (
 )
 
 var (
-	// Not sure if these should be null terminated.  Documentation in
-	// libhdhomerun does not specify null terminated strings for
-	// discovery packets where the following values are used
 	DeviceTypeWildcard []byte = []byte{0xFF, 0xFF, 0xFF, 0xFF}
 	DeviceTypeTuner    []byte = []byte{0x00, 0x00, 0x00, 0x01}
 	DeviceTypeStorage  []byte = []byte{0x00, 0x00, 0x00, 0x05}
