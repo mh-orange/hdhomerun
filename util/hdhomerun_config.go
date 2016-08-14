@@ -65,7 +65,7 @@ func main() {
 		}
 
 		for _, device := range devices {
-			fmt.Printf("hdhomerun device %s found at %v\n", device.ID(), device.IP())
+			fmt.Printf("hdhomerun device %s found at %v\n", device.ID(), device.Location())
 		}
 	} else {
 		device, err := deviceFromId(os.Args[1])

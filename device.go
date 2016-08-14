@@ -5,25 +5,23 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 )
 
 type Device struct {
+	Connection
 	id   []byte
 	ip   net.IP
 	port int
-	conn net.Conn
 	e    *Encoder
 	d    *Decoder
 }
 
 func Discover(ip net.IP, timeout time.Duration) (map[string]*Device, error) {
-	var wg sync.WaitGroup
 	if ip == nil {
 		ip = net.IPv4bcast
 	}
-	discovered := make(map[string]*Device)
+	devices := make(chan *Device, 10)
 
 	laddr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", laddr)
@@ -32,9 +30,8 @@ func Discover(ip net.IP, timeout time.Duration) (map[string]*Device, error) {
 		return nil, err
 	}
 
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer close(devices)
 		var raddr *net.UDPAddr
 		var n int
 		var p *Packet
@@ -59,13 +56,12 @@ func Discover(ip net.IP, timeout time.Duration) (map[string]*Device, error) {
 			if p.Type != TypeDiscoverRpy {
 				continue
 			}
-			if discovered[raddr.String()] == nil {
-				discovered[raddr.String()] = nil
-				discovered[raddr.String()] = NewDevice(raddr.IP, raddr.Port, p.Tags[TagDeviceId].Value)
-			}
+			device := NewDevice(NewTcpConnection(raddr.IP, raddr.Port), p.Tags[TagDeviceId].Value)
+			devices <- device
 		}
 	}()
 
+	discoveredDevices := make(map[string]*Device)
 	for i := 0; i < 2; i++ {
 		writeBuffer := bytes.NewBuffer([]byte{})
 		encoder := NewEncoder(writeBuffer)
@@ -79,25 +75,17 @@ func Discover(ip net.IP, timeout time.Duration) (map[string]*Device, error) {
 		}
 	}
 
-	wg.Wait()
-	devices := make(map[string]*Device, len(discovered))
-	for _, device := range discovered {
-		devices[device.ID()] = device
+	for device := range devices {
+		discoveredDevices[device.ID()] = device
 	}
-	return devices, err
+
+	return discoveredDevices, err
 }
 
-func Connect(id, ip string, port uint16) *Device {
-	d := &Device{}
-
-	return d
-}
-
-func NewDevice(ip net.IP, port int, id []byte) *Device {
+func NewDevice(conn Connection, id []byte) *Device {
 	return &Device{
-		id:   id,
-		ip:   ip,
-		port: port,
+		Connection: conn,
+		id:         id,
 	}
 }
 
@@ -110,13 +98,17 @@ func (d *Device) IP() net.IP {
 }
 
 func (d *Device) getset(name string, value *string) (resp string, err error) {
-	if d.conn == nil {
-		d.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{d.ip, 65001, ""})
-		if err != nil {
-			return
-		}
-		d.e = NewEncoder(d.conn)
-		d.d = NewDecoder(d.conn)
+	err = d.Connect()
+	if err != nil {
+		return
+	}
+
+	if d.e == nil {
+		d.e = NewEncoder(d)
+	}
+
+	if d.d == nil {
+		d.d = NewDecoder(d)
 	}
 
 	tags := make(map[TagType]TagValue)

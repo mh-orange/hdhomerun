@@ -67,11 +67,11 @@ func parseStatusStr(str string, s *TunerStatus) (err error) {
 }
 
 type Tuner struct {
-	d *Device
+	d GetSetter
 	n int
 }
 
-func newTuner(d *Device, n int) *Tuner {
+func newTuner(d GetSetter, n int) *Tuner {
 	return &Tuner{
 		d: d,
 		n: n,
