@@ -3,18 +3,15 @@ package hdhomerun
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"net"
 	"time"
 )
 
 type Device struct {
 	Connection
-	id   []byte
-	ip   net.IP
-	port int
-	e    *Encoder
-	d    *Decoder
+	id []byte
+	e  *Encoder
+	d  *Decoder
 }
 
 func Discover(ip net.IP, timeout time.Duration) (map[string]*Device, error) {
@@ -93,10 +90,6 @@ func (d *Device) ID() string {
 	return hex.EncodeToString(d.id)
 }
 
-func (d *Device) IP() net.IP {
-	return d.ip
-}
-
 func (d *Device) getset(name string, value *string) (resp string, err error) {
 	err = d.Connect()
 	if err != nil {
@@ -123,11 +116,11 @@ func (d *Device) getset(name string, value *string) (resp string, err error) {
 		var p *Packet
 		p, err = d.d.Next()
 		if p.Type != TypeGetSetRpy {
-			err = fmt.Errorf("Expected Get/Set reply but got %s", p.Type)
+			err = wrongPacketType(TypeGetSetRpy, p.Type)
 		} else {
 			resp = p.Tags[TagGetSetValue].String()
 			if tag, found := p.Tags[TagErrorMsg]; found {
-				err = fmt.Errorf("Get/Set failed: %v", tag.String())
+				err = ErrRemoteError(tag.String())
 			}
 		}
 	}
