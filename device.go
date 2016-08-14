@@ -149,3 +149,7 @@ func (d *Device) Get(name string) (string, error) {
 func (d *Device) Set(name, value string) (string, error) {
 	return d.getset(name, &value)
 }
+
+func (d *Device) Tuner(n int) *Tuner {
+	return newTuner(d, n)
+}

@@ -35,6 +35,9 @@ func (e *Encoder) Encode(p *Packet) error {
 		if len(tag.Value) > 127 {
 			length += 1
 		}
+		if (tag.Type == TagGetSetName || tag.Type == TagGetSetValue) && tag.Value[len(tag.Value)-1] != 0x00 {
+			length += 1
+		}
 	}
 
 	binary.Write(buffer, binary.BigEndian, p.Type)
@@ -43,7 +46,13 @@ func (e *Encoder) Encode(p *Packet) error {
 	/* Order the tags deterministically */
 	p.Tags.Iterate(func(t Tag) {
 		buffer.Write([]byte{byte(t.Type)})
-		length := uint8(len(t.Value))
+		// Null terminate the string
+		if t.Type == TagGetSetName || t.Type == TagGetSetValue {
+			if t.Value[len(t.Value)-1] != 0x00 {
+				t.Value = append(t.Value, 0x00)
+			}
+		}
+		length := uint16(len(t.Value))
 		if length > 127 {
 			lsb := 0x80 | (length & 0x00ff)
 			msb := length >> 7

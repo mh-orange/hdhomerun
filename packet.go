@@ -131,7 +131,7 @@ type Tag struct {
 }
 
 func (t Tag) String() string {
-	return string(t.Value)
+	return t.Value.String()
 }
 
 func (t Tag) Dump() string {

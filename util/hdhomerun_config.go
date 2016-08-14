@@ -96,7 +96,10 @@ func main() {
 			}
 			fmt.Printf("%s\n", resp)
 		case "scan":
-			fmt.Printf("Not implemented\n")
+			tuner := device.Tuner(0)
+			for channel := range tuner.Scan() {
+				fmt.Printf("Channel %d\n", channel.Frequency)
+			}
 		case "save":
 			fmt.Printf("Not implemented\n")
 		case "upgrade":

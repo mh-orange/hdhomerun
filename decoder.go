@@ -89,6 +89,10 @@ func (pd *packetDecoder) decode() (p *Packet, err error) {
 
 		t.Value = make([]byte, tagLength)
 		pd.Read(t.Value)
+		// remove null byte
+		if t.Type == TagGetSetName || t.Type == TagGetSetValue {
+			t.Value = t.Value[0 : len(t.Value)-1]
+		}
 		if pd.err == nil {
 			p.Tags[t.Type] = t
 		}
