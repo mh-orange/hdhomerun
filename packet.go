@@ -65,6 +65,10 @@ func NewPacket(t PacketType, tags map[TagType]TagValue) *Packet {
 }
 
 func (p *Packet) Dump() string {
+	if p == nil {
+		return "<nil>"
+	}
+
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("  Type: %s\n", p.Type))
 	buffer.WriteString("  Tags:\n")

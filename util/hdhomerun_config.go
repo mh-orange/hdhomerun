@@ -38,18 +38,20 @@ func deviceFromId(id string) (*hdhomerun.Device, error) {
 			ip = ipAddr.IP
 		}
 	}
+
+	ch := make(chan *hdhomerun.Device)
 	devices, err := hdhomerun.Discover(ip, time.Millisecond*200)
-	if ip != nil {
-		var device *hdhomerun.Device
-		for _, device = range devices {
-			return device, err
+	go func() {
+		for device := range devices {
+			if ip != nil || device.ID() == id {
+				ch <- device
+			}
 		}
 
-		if err == nil && device == nil {
-			err = fmt.Errorf("Timeout connecting to to %s", id)
-		}
-	}
-	return devices[id], err
+		close(ch)
+	}()
+
+	return <-ch, err
 }
 
 func main() {
@@ -64,12 +66,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		for _, device := range devices {
-			fmt.Printf("hdhomerun device %s found at %v\n", device.ID(), device.Location())
+		for device := range devices {
+			fmt.Printf("hdhomerun device %s found at %s\n", device.ID(), device.Addr)
 		}
 	} else {
 		device, err := deviceFromId(os.Args[1])
-		if err != nil {
+		if device == nil || err != nil {
 			fmt.Printf("Could not connect to device: %v\n", err)
 			os.Exit(1)
 		}

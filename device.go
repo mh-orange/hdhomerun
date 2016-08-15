@@ -3,86 +3,108 @@ package hdhomerun
 import (
 	"bytes"
 	"encoding/hex"
+	"io"
 	"net"
 	"time"
 )
 
 type Device struct {
 	Connection
-	id []byte
-	e  *Encoder
-	d  *Decoder
+	id   []byte
+	e    *Encoder
+	d    *Decoder
+	Addr string
 }
 
-func Discover(ip net.IP, timeout time.Duration) (map[string]*Device, error) {
+type discoverConn interface {
+	Close() error
+	ReadFrom([]byte) (int, net.Addr, error)
+	SetReadDeadline(time.Time) error
+	WriteTo([]byte, net.Addr) (int, error)
+}
+
+var listenUDP = func() (discoverConn, error) {
+	return net.ListenUDP("udp", nil)
+}
+
+func Discover(ip net.IP, timeout time.Duration) (chan *Device, error) {
 	if ip == nil {
 		ip = net.IPv4bcast
 	}
-	devices := make(chan *Device, 10)
 
-	laddr, _ := net.ResolveUDPAddr("udp", ":0")
-	conn, err := net.ListenUDP("udp", laddr)
-	defer conn.Close()
+	conn, err := listenUDP()
 	if err != nil {
 		return nil, err
 	}
 
+	devices := make(chan *Device, 10)
 	go func() {
+		buffer := make([]byte, 1500)
+		readBuffer := bytes.NewBuffer(make([]byte, 1500))
+		readBuffer.Reset()
+		decoder := NewDecoder(readBuffer)
+		discovered := make(map[string]bool)
 		defer close(devices)
-		var raddr *net.UDPAddr
-		var n int
-		var p *Packet
 
-		buffer := make([]byte, 1024)
 		end := time.Now().Add(timeout)
 		for t := time.Now(); t.Before(end); t = time.Now() {
-			conn.SetReadDeadline(time.Now().Add((10 * time.Millisecond)))
-			n, raddr, err = conn.ReadFromUDP(buffer)
+			conn.SetReadDeadline(time.Now().Add(timeout))
+
+			n, addr, err := conn.ReadFrom(buffer)
 			if err != nil {
 				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-					err = nil
 					continue
+				} else if err != io.EOF {
+					Logger.Printf("1) %v", err)
 				}
 				break
 			}
-			decoder := NewDecoder(bytes.NewBuffer(buffer[0:n]))
-			p, err = decoder.Next()
+
+			readBuffer.Write(buffer[0:n])
+			p, err := decoder.Next()
+
 			if err != nil {
+				Logger.Printf("%v", err)
 				break
 			}
+
 			if p.Type != TypeDiscoverRpy {
 				continue
 			}
-			device := NewDevice(NewTcpConnection(raddr.IP, raddr.Port), p.Tags[TagDeviceId].Value)
-			devices <- device
+
+			if _, found := discovered[addr.String()]; !found {
+				devices <- NewDevice(NewTCPConnection(addr.String()), p.Tags[TagDeviceId].Value, addr.String())
+			}
+			discovered[addr.String()] = true
+		}
+		conn.Close()
+	}()
+
+	writeBuffer := bytes.NewBuffer([]byte{})
+	encoder := NewEncoder(writeBuffer)
+	go func() {
+		for i := 0; i < 2; i++ {
+			err := encoder.Encode(NewPacket(TypeDiscoverReq, map[TagType]TagValue{
+				TagDeviceType: DeviceTypeTuner,
+				TagDeviceId:   DeviceIdWildcard,
+			}))
+			if err == nil {
+				_, err = conn.WriteTo(writeBuffer.Bytes(), &net.UDPAddr{IP: ip, Port: 65001})
+			}
+			if err != nil {
+				Logger.Printf("Failed to send discovery packet: %v", err)
+			}
 		}
 	}()
 
-	discoveredDevices := make(map[string]*Device)
-	for i := 0; i < 2; i++ {
-		writeBuffer := bytes.NewBuffer([]byte{})
-		encoder := NewEncoder(writeBuffer)
-		encoder.Encode(NewPacket(TypeDiscoverReq, map[TagType]TagValue{
-			TagDeviceType: DeviceTypeTuner,
-			TagDeviceId:   DeviceIdWildcard,
-		}))
-		_, err = conn.WriteTo(writeBuffer.Bytes(), &net.UDPAddr{ip, 65001, ""})
-		if err != nil {
-			Logger.Printf("Failed to send discovery packet: %v", err)
-		}
-	}
-
-	for device := range devices {
-		discoveredDevices[device.ID()] = device
-	}
-
-	return discoveredDevices, err
+	return devices, nil
 }
 
-func NewDevice(conn Connection, id []byte) *Device {
+func NewDevice(conn Connection, id []byte, addr string) *Device {
 	return &Device{
 		Connection: conn,
 		id:         id,
+		Addr:       addr,
 	}
 }
 
@@ -91,19 +113,6 @@ func (d *Device) ID() string {
 }
 
 func (d *Device) getset(name string, value *string) (resp string, err error) {
-	err = d.Connect()
-	if err != nil {
-		return
-	}
-
-	if d.e == nil {
-		d.e = NewEncoder(d)
-	}
-
-	if d.d == nil {
-		d.d = NewDecoder(d)
-	}
-
 	tags := make(map[TagType]TagValue)
 	tags[TagGetSetName] = TagValue(name)
 
@@ -111,10 +120,10 @@ func (d *Device) getset(name string, value *string) (resp string, err error) {
 		tags[TagGetSetValue] = TagValue(*value)
 	}
 
-	err = d.e.Encode(NewPacket(TypeGetSetReq, tags))
+	err = d.Send(NewPacket(TypeGetSetReq, tags))
 	if err == nil {
 		var p *Packet
-		p, err = d.d.Next()
+		p, err = d.Recv()
 		if p.Type != TypeGetSetRpy {
 			err = wrongPacketType(TypeGetSetRpy, p.Type)
 		} else {

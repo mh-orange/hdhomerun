@@ -7,7 +7,7 @@ import (
 type ErrWrongPacketType string
 
 func wrongPacketType(expected, received PacketType) error {
-	return ErrWrongPacketType(fmt.Sprintf("Expected %s reply but got %s", expected, received))
+	return ErrWrongPacketType(fmt.Sprintf("Expected packet type %s but got %s", expected, received))
 }
 
 func (e ErrWrongPacketType) Error() string {

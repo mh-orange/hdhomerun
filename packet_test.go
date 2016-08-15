@@ -5,13 +5,27 @@ import (
 )
 
 func TestPacketDump(t *testing.T) {
-	expected := "  Type: Discover Request\n"
-	expected += "  Tags:\n"
-	expected += "             Device Type: tuner\n"
-	expected += "               Device ID: *\n"
-	received := discoverReq.p.Dump()
-	if received != expected {
-		t.Errorf("Unexpected output:\nExpected:\n%s\n     Got:\n%s", expected, received)
+	tests := []struct {
+		p        *Packet
+		expected string
+	}{
+		{
+			p: discoverReq.p,
+			expected: "  Type: Discover Request\n" +
+				"  Tags:\n" +
+				"             Device Type: tuner\n" +
+				"               Device ID: *\n",
+		}, {
+			p:        nil,
+			expected: "<nil>",
+		},
+	}
+
+	for _, test := range tests {
+		received := test.p.Dump()
+		if received != test.expected {
+			t.Errorf("Unexpected output:\nExpected:\n%s\n     Got:\n%s", test.expected, received)
+		}
 	}
 }
 
