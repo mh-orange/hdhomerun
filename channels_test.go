@@ -7,11 +7,11 @@ import (
 
 func TestChannels(t *testing.T) {
 	tests := []struct {
-		cr       ChannelRange
+		cr       channelRange
 		expected []Channel
 	}{
 		{
-			cr: ChannelRange{
+			cr: channelRange{
 				Start:     2,
 				End:       4,
 				Frequency: 57000000,
@@ -24,7 +24,7 @@ func TestChannels(t *testing.T) {
 			},
 		},
 		{
-			cr: ChannelRange{
+			cr: channelRange{
 				Start:     7,
 				End:       13,
 				Frequency: 177000000,
@@ -52,7 +52,7 @@ func TestChannels(t *testing.T) {
 }
 
 func TestChannelMap(t *testing.T) {
-	channels := ChannelMap{
+	channels := channelMap{
 		{2, 4, 57000000, 6000000},
 		{5, 6, 79000000, 6000000},
 		{7, 13, 177000000, 6000000},
@@ -79,8 +79,8 @@ func TestChannelMap(t *testing.T) {
 		{100, 158, 651012500, 6000000},
 	}
 
-	if !reflect.DeepEqual(channels, ChannelMapTable["us-cable"]) {
-		t.Errorf("Expected\n%v\nGot\n%v\n", channels, ChannelMapTable["us-cable"])
+	if !reflect.DeepEqual(channels, channelMapTable["us-cable"]) {
+		t.Errorf("Expected\n%v\nGot\n%v\n", channels, channelMapTable["us-cable"])
 	}
 }
 

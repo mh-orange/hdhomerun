@@ -12,14 +12,14 @@ type Channel struct {
 	Name       string
 }
 
-type ChannelRange struct {
+type channelRange struct {
 	Start     int
 	End       int
 	Frequency uint32
 	Spacing   uint32
 }
 
-type ChannelMap []ChannelRange
+type channelMap []channelRange
 
 func channelFrequencyRound(frequency, resolution uint32) uint32 {
 	frequency += resolution / 2
@@ -30,7 +30,7 @@ func channelFrequencyRoundNormal(frequency uint32) uint32 {
 	return channelFrequencyRound(frequency, 125000)
 }
 
-func (cr ChannelRange) Channels() []Channel {
+func (cr channelRange) Channels() []Channel {
 	ch := make(chan Channel)
 	channels := make([]Channel, 0)
 	go func() { cr.channels(ch); close(ch) }()
@@ -40,7 +40,7 @@ func (cr ChannelRange) Channels() []Channel {
 	return channels
 }
 
-func (cr ChannelRange) channels(txCh chan Channel) {
+func (cr channelRange) channels(txCh chan Channel) {
 	for i := cr.Start; i <= cr.End; i++ {
 		txCh <- Channel{
 			Number:     i,
@@ -52,21 +52,21 @@ func (cr ChannelRange) channels(txCh chan Channel) {
 }
 
 var (
-	AUBcastChannelMap = ChannelMap{
+	auBcastChannelMap = channelMap{
 		{5, 12, 177500000, 7000000},
 		{21, 69, 480500000, 7000000},
 	}
 
-	EUCableChannelMap = ChannelMap{
+	euCableChannelMap = channelMap{
 		{108, 862, 108000000, 1000000},
 	}
 
-	EUBcastChannelMap = ChannelMap{
+	euBcastChannelMap = channelMap{
 		{5, 12, 177500000, 7000000},
 		{21, 69, 474000000, 8000000},
 	}
 
-	KRCableChannelMap = ChannelMap{
+	krCableChannelMap = channelMap{
 		{2, 4, 57000000, 6000000},
 		{5, 6, 79000000, 6000000},
 		{7, 13, 177000000, 6000000},
@@ -74,14 +74,14 @@ var (
 		{23, 153, 219000000, 6000000},
 	}
 
-	USBcastChannelMap = ChannelMap{
+	usBcastChannelMap = channelMap{
 		{2, 4, 57000000, 6000000},
 		{5, 6, 79000000, 6000000},
 		{7, 13, 177000000, 6000000},
 		{14, 69, 473000000, 6000000},
 	}
 
-	USCableChannelMap = ChannelMap{
+	usCableChannelMap = channelMap{
 		{2, 4, 57000000, 6000000},
 		{5, 6, 79000000, 6000000},
 		{7, 13, 177000000, 6000000},
@@ -91,7 +91,7 @@ var (
 		{100, 158, 651000000, 6000000},
 	}
 
-	USHrcChannelMap = ChannelMap{
+	usHrcChannelMap = channelMap{
 		{2, 4, 55752700, 6000300},
 		{5, 6, 79753900, 6000300},
 		{7, 13, 175758700, 6000300},
@@ -101,7 +101,7 @@ var (
 		{100, 158, 649782400, 6000300},
 	}
 
-	USIrcChannelMap = ChannelMap{
+	usIrcChannelMap = channelMap{
 		{2, 4, 57012500, 6000000},
 		{5, 6, 81012500, 6000000},
 		{7, 13, 177012500, 6000000},
@@ -114,24 +114,24 @@ var (
 		{100, 158, 651012500, 6000000},
 	}
 
-	JPBcastChannelMap = ChannelMap{
+	jpBcastChannelMap = channelMap{
 		{13, 62, 473000000, 6000000},
 	}
 
-	ChannelMapTable = map[string]ChannelMap{
-		"au-bcast": AUBcastChannelMap,
-		"au-cable": EUCableChannelMap,
-		"eu-bcast": EUBcastChannelMap,
-		"eu-cable": EUCableChannelMap,
-		"tw-bcast": USBcastChannelMap,
-		"tw-cable": USCableChannelMap,
-		"kr-bcast": USBcastChannelMap,
-		"kr-cable": KRCableChannelMap,
-		"us-bcast": USBcastChannelMap,
-		"us-cable": append(USCableChannelMap, append(USHrcChannelMap, USIrcChannelMap...)...),
-		"us-hrc":   append(USCableChannelMap, append(USHrcChannelMap, USIrcChannelMap...)...),
-		"us-irc":   append(USCableChannelMap, append(USHrcChannelMap, USIrcChannelMap...)...),
-		"jp-bcast": JPBcastChannelMap,
+	channelMapTable = map[string]channelMap{
+		"au-bcast": auBcastChannelMap,
+		"au-cable": euCableChannelMap,
+		"eu-bcast": euBcastChannelMap,
+		"eu-cable": euCableChannelMap,
+		"tw-bcast": usBcastChannelMap,
+		"tw-cable": usCableChannelMap,
+		"kr-bcast": usBcastChannelMap,
+		"kr-cable": krCableChannelMap,
+		"us-bcast": usBcastChannelMap,
+		"us-cable": append(usCableChannelMap, append(usHrcChannelMap, usIrcChannelMap...)...),
+		"us-hrc":   append(usCableChannelMap, append(usHrcChannelMap, usIrcChannelMap...)...),
+		"us-irc":   append(usCableChannelMap, append(usHrcChannelMap, usIrcChannelMap...)...),
+		"jp-bcast": jpBcastChannelMap,
 	}
 )
 
@@ -141,9 +141,9 @@ func Channels(channelMap string) chan Channel {
 	go func() {
 		var wg sync.WaitGroup
 
-		for _, cr := range ChannelMapTable[channelMap] {
+		for _, cr := range channelMapTable[channelMap] {
 			wg.Add(1)
-			go func(cr ChannelRange) { defer wg.Done(); cr.channels(ch) }(cr)
+			go func(cr channelRange) { defer wg.Done(); cr.channels(ch) }(cr)
 		}
 
 		wg.Wait()
