@@ -20,6 +20,18 @@ type TunerStatus struct {
 	PacketsPerSecond     int
 }
 
+func (ts *TunerStatus) Dump() string {
+	return fmt.Sprintf("ch=%s lock=%s ss=%d snq=%d seq=%d bps=%d pps=%d",
+		ts.Channel,
+		ts.LockStr,
+		ts.SignalStrength,
+		ts.SignalToNoiseQuality,
+		ts.SymbolErrorQuality,
+		ts.BitsPerSecond,
+		ts.PacketsPerSecond,
+	)
+}
+
 func parseInt(str string) (int, error) {
 	i, err := strconv.ParseInt(str, 10, 0)
 	return int(i), err
