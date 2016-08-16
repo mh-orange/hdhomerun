@@ -13,7 +13,7 @@ func TestParseInt(t *testing.T) {
 	}
 }
 
-func TestParseStatusStr(t *testing.T) {
+func TestUnmarshalStatus(t *testing.T) {
 	nilType := reflect.Type(nil)
 	tests := []struct {
 		str         string
@@ -85,7 +85,7 @@ func TestParseStatusStr(t *testing.T) {
 
 	for _, test := range tests {
 		received := &TunerStatus{}
-		err := parseStatusStr(test.str, received)
+		err := received.UnmarshalText([]byte(test.str))
 		if reflect.TypeOf(err) != test.expectedErr {
 			t.Errorf("Expected error '%v' but got '%v", test.expectedErr, reflect.TypeOf(err))
 		}
@@ -103,6 +103,18 @@ func TestParseStatusStr(t *testing.T) {
 }
 
 func TestStatus(t *testing.T) {
+	device, mock := newTestDevice()
+	mock.reader.Encode(statusRpy.p)
+
+	tuner := device.Tuner(0)
+	_, err := tuner.Status()
+	if err != nil {
+		t.Errorf("Did not expect an error but got %v", err)
+	}
+	received, _ := mock.writer.Next()
+	if !reflect.DeepEqual(statusReq.p, received) {
+		t.Errorf("Expected request packet:\n%s\nGot:\n%s", statusReq.p.Dump(), received.Dump())
+	}
 }
 
 func TestWaitForLock(t *testing.T) {

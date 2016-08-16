@@ -2,14 +2,80 @@ package hdhomerun
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
+
+type ProgramType int
+
+const (
+	ProgramTypeNormal = iota
+	ProgramTypeNoData
+	ProgramTypeControl
+	ProgramTypeEncrypted
+)
+
+type Program struct {
+	Name         string
+	Type         ProgramType
+	Number       int
+	VirtualMajor int
+	VirtualMinor int
+}
+
+func parseProgramString(str string, program *Program) (err error) {
+	tokens := strings.Split(str, ": ")
+	if len(tokens) < 2 {
+		return ErrParseError("Failed to parse " + str)
+	}
+	program.Number, err = parseInt(tokens[0])
+	if err != nil {
+		return err
+	}
+	tokens = strings.Split(tokens[1], " ")
+	i := strings.Index(tokens[0], ".")
+	if i != -1 {
+		program.VirtualMajor, err = parseInt(tokens[0][0:i])
+		if err == nil {
+			program.VirtualMinor, err = parseInt(tokens[0][i:])
+		}
+	} else {
+		program.VirtualMajor, err = parseInt(tokens[0])
+	}
+
+	if err != nil {
+		return err
+	}
+	tokens = tokens[1:]
+
+	if len(tokens) == 0 {
+		return ErrParseError("No program name or tags")
+	}
+
+	if tokens[len(tokens)-1] == "(control)" {
+		program.Type = ProgramTypeControl
+		tokens = tokens[0 : len(tokens)-1]
+	} else if tokens[len(tokens)-1] == "(encrypted)" {
+		program.Type = ProgramTypeEncrypted
+		tokens = tokens[0 : len(tokens)-1]
+	} else if tokens[len(tokens)-1] == "(no data)" {
+		program.Type = ProgramTypeNoData
+		tokens = tokens[0 : len(tokens)-1]
+	} else {
+		program.Type = ProgramTypeNormal
+	}
+
+	program.Name = strings.Join(tokens, " ")
+
+	return nil
+}
 
 type Channel struct {
 	Number     int
 	Frequency  uint32
 	Modulation string
 	Name       string
+	Programs   []Program
 }
 
 type channelRange struct {

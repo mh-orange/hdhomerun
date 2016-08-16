@@ -1,6 +1,7 @@
 package hdhomerun
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"testing"
@@ -51,7 +52,7 @@ func TestGet(t *testing.T) {
 	d, mock := newTestDevice()
 	mock.reader.Encode(getRpy.p)
 	value, _ := d.Get("help")
-	if value != getRpy.p.Tags[TagGetSetValue].String() {
+	if !bytes.Equal(value, getRpy.p.Tags[TagGetSetValue].Value) {
 		t.Errorf("Device get failed.\nExpected:\n%s\nReceived:\n%s\n", getRpy.p.Tags[TagGetSetValue].String(), value)
 	}
 }

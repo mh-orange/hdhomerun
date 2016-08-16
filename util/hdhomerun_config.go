@@ -39,19 +39,15 @@ func deviceFromId(id string) (*hdhomerun.Device, error) {
 		}
 	}
 
-	ch := make(chan *hdhomerun.Device)
 	devices, err := hdhomerun.Discover(ip, time.Millisecond*200)
-	go func() {
-		for device := range devices {
-			if ip != nil || device.ID() == id {
-				ch <- device
-			}
+	for device := range devices {
+		if ip != nil || device.ID() == id {
+			device.Connect()
+			return device, err
 		}
+	}
 
-		close(ch)
-	}()
-
-	return <-ch, err
+	return nil, err
 }
 
 func main() {
@@ -101,6 +97,7 @@ func main() {
 			tuner := device.Tuner(0)
 			for channel := range tuner.Scan() {
 				fmt.Printf("Channel %d\n", channel.Frequency)
+				fmt.Printf("\tStreaminfo: %s", channel.StreamInfo)
 			}
 		case "save":
 			fmt.Printf("Not implemented\n")

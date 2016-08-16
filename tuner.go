@@ -2,7 +2,6 @@ package hdhomerun
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -20,6 +19,10 @@ type TunerStatus struct {
 	PacketsPerSecond     int
 }
 
+func (ts *TunerStatus) MarshalText() ([]byte, error) {
+	return []byte(ts.Dump()), nil
+}
+
 func (ts *TunerStatus) Dump() string {
 	return fmt.Sprintf("ch=%s lock=%s ss=%d snq=%d seq=%d bps=%d pps=%d",
 		ts.Channel,
@@ -32,30 +35,27 @@ func (ts *TunerStatus) Dump() string {
 	)
 }
 
-func parseInt(str string) (int, error) {
-	i, err := strconv.ParseInt(str, 10, 0)
-	return int(i), err
-}
+func (ts *TunerStatus) UnmarshalText(text []byte) (err error) {
+	str := string(text)
 
-func parseStatusStr(str string, s *TunerStatus) (err error) {
 	for _, kv := range strings.Split(str, " ") {
 		if kv != "" {
 			pair := strings.Split(kv, "=")
 			switch pair[0] {
 			case "ch":
-				s.Channel = pair[1]
+				ts.Channel = pair[1]
 			case "lock":
-				s.LockStr = pair[1]
+				ts.LockStr = pair[1]
 			case "ss":
-				s.SignalStrength, err = parseInt(pair[1])
+				ts.SignalStrength, err = parseInt(pair[1])
 			case "snq":
-				s.SignalToNoiseQuality, err = parseInt(pair[1])
+				ts.SignalToNoiseQuality, err = parseInt(pair[1])
 			case "seq":
-				s.SymbolErrorQuality, err = parseInt(pair[1])
+				ts.SymbolErrorQuality, err = parseInt(pair[1])
 			case "bps":
-				s.BitsPerSecond, err = parseInt(pair[1])
+				ts.BitsPerSecond, err = parseInt(pair[1])
 			case "pps":
-				s.PacketsPerSecond, err = parseInt(pair[1])
+				ts.PacketsPerSecond, err = parseInt(pair[1])
 			}
 		}
 
@@ -65,12 +65,12 @@ func parseStatusStr(str string, s *TunerStatus) (err error) {
 	}
 
 	if err == nil {
-		s.SignalPresent = s.SignalStrength >= 45
-		if s.LockStr != "none" {
-			if s.LockStr[0] == '(' {
-				s.LockUnsupported = true
+		ts.SignalPresent = ts.SignalStrength >= 45
+		if ts.LockStr != "none" {
+			if ts.LockStr[0] == '(' {
+				ts.LockUnsupported = true
 			} else {
-				s.LockSupported = true
+				ts.LockSupported = true
 			}
 		}
 	}
@@ -90,23 +90,25 @@ func newTuner(d GetSetter, n int) *Tuner {
 	}
 }
 
-func (t *Tuner) GetTuner(name string) (string, error) {
+func (t *Tuner) GetTuner(name string) (TagValue, error) {
 	return t.d.Get(fmt.Sprintf("/tuner%d/%s", t.n, name))
 }
 
-func (t *Tuner) SetTuner(name, value string) (string, error) {
+func (t *Tuner) SetTuner(name, value string) (TagValue, error) {
 	return t.d.Set(fmt.Sprintf("/tuner%d/%s", t.n, name), value)
 }
 
-func (t *Tuner) Status() (status TunerStatus, err error) {
-	str, err := t.GetTuner("status")
+func (t *Tuner) Status() (*TunerStatus, error) {
+	status := &TunerStatus{}
+
+	value, err := t.GetTuner("status")
 	if err == nil {
-		err = parseStatusStr(str, &status)
+		err = status.UnmarshalText(value)
 	}
 	return status, err
 }
 
-func (t *Tuner) WaitForLock() (status TunerStatus, err error) {
+func (t *Tuner) WaitForLock() (status *TunerStatus, err error) {
 	time.Sleep(250 * time.Millisecond)
 	timeout := time.Now().Add(2500 * time.Millisecond)
 
@@ -137,6 +139,10 @@ func (t *Tuner) Tune(channel Channel) error {
 	return err
 }
 
+func (t *Tuner) StreamInfo() (TagValue, error) {
+	return t.GetTuner("streaminfo")
+}
+
 func (t *Tuner) Scan() chan Channel {
 	visited := make(map[uint32]bool)
 
@@ -144,16 +150,38 @@ func (t *Tuner) Scan() chan Channel {
 	go func() {
 		channelmap, err := t.GetTuner("channelmap")
 		if err == nil {
-			for channel := range Channels(channelmap) {
+			for channel := range Channels(channelmap.String()) {
 				if visited[channel.Frequency] {
 					continue
 				}
 				visited[channel.Frequency] = true
 				t.Tune(channel)
-				_, err := t.WaitForLock()
+				status, err := t.WaitForLock()
 				if err != nil {
 					Logger.Printf("Error waiting for lock: %v", err)
-				} else {
+				} else if !status.LockSupported {
+					continue
+				}
+
+				timeout := time.Now().Add(5 * time.Second)
+				for {
+					status, err = t.Status()
+					if err != nil {
+						break
+					}
+
+					if status.SymbolErrorQuality == 100 || time.Now().After(timeout) {
+						break
+					}
+
+					time.Sleep(250 * time.Millisecond)
+				}
+
+				/*if err == nil {
+					channel.StreamInfo, err = t.StreamInfo()
+				}*/
+
+				if err == nil {
 					ch <- channel
 				}
 			}

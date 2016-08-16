@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+type ErrParseError string
+
+func (e ErrParseError) Error() string {
+	return string(e)
+}
+
 type ErrWrongPacketType string
 
 func wrongPacketType(expected, received PacketType) error {

@@ -112,7 +112,7 @@ func (d *Device) ID() string {
 	return hex.EncodeToString(d.id)
 }
 
-func (d *Device) getset(name string, value *string) (resp string, err error) {
+func (d *Device) getset(name string, value *string) (resp TagValue, err error) {
 	tags := make(map[TagType]TagValue)
 	tags[TagGetSetName] = TagValue(name)
 
@@ -127,7 +127,7 @@ func (d *Device) getset(name string, value *string) (resp string, err error) {
 		if p.Type != TypeGetSetRpy {
 			err = wrongPacketType(TypeGetSetRpy, p.Type)
 		} else {
-			resp = p.Tags[TagGetSetValue].String()
+			resp = p.Tags[TagGetSetValue].Value
 			if tag, found := p.Tags[TagErrorMsg]; found {
 				err = ErrRemoteError(tag.String())
 			}
@@ -136,11 +136,11 @@ func (d *Device) getset(name string, value *string) (resp string, err error) {
 	return
 }
 
-func (d *Device) Get(name string) (string, error) {
+func (d *Device) Get(name string) (TagValue, error) {
 	return d.getset(name, nil)
 }
 
-func (d *Device) Set(name, value string) (string, error) {
+func (d *Device) Set(name, value string) (TagValue, error) {
 	return d.getset(name, &value)
 }
 
