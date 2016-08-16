@@ -177,9 +177,14 @@ func (t *Tuner) Scan() chan Channel {
 					time.Sleep(250 * time.Millisecond)
 				}
 
-				/*if err == nil {
-					channel.StreamInfo, err = t.StreamInfo()
-				}*/
+				if err == nil {
+					channel.Name = fmt.Sprintf("%s:%d", status.LockStr, channel.Number)
+					var si TagValue
+					si, err = t.StreamInfo()
+					if err == nil {
+						channel.UnmarshalText(si)
+					}
+				}
 
 				if err == nil {
 					ch <- channel

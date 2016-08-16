@@ -1,6 +1,8 @@
 package hdhomerun
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"strings"
 	"sync"
@@ -23,24 +25,25 @@ type Program struct {
 	VirtualMinor int
 }
 
-func parseProgramString(str string, program *Program) (err error) {
+func (p *Program) UnmarshalText(value TagValue) (err error) {
+	str := string(value)
 	tokens := strings.Split(str, ": ")
 	if len(tokens) < 2 {
 		return ErrParseError("Failed to parse " + str)
 	}
-	program.Number, err = parseInt(tokens[0])
+	p.Number, err = parseInt(tokens[0])
 	if err != nil {
 		return err
 	}
 	tokens = strings.Split(tokens[1], " ")
 	i := strings.Index(tokens[0], ".")
 	if i != -1 {
-		program.VirtualMajor, err = parseInt(tokens[0][0:i])
+		p.VirtualMajor, err = parseInt(tokens[0][0:i])
 		if err == nil {
-			program.VirtualMinor, err = parseInt(tokens[0][i:])
+			p.VirtualMinor, err = parseInt(tokens[0][i:])
 		}
 	} else {
-		program.VirtualMajor, err = parseInt(tokens[0])
+		p.VirtualMajor, err = parseInt(tokens[0])
 	}
 
 	if err != nil {
@@ -53,29 +56,69 @@ func parseProgramString(str string, program *Program) (err error) {
 	}
 
 	if tokens[len(tokens)-1] == "(control)" {
-		program.Type = ProgramTypeControl
+		p.Type = ProgramTypeControl
 		tokens = tokens[0 : len(tokens)-1]
 	} else if tokens[len(tokens)-1] == "(encrypted)" {
-		program.Type = ProgramTypeEncrypted
+		p.Type = ProgramTypeEncrypted
 		tokens = tokens[0 : len(tokens)-1]
 	} else if tokens[len(tokens)-1] == "(no data)" {
-		program.Type = ProgramTypeNoData
+		p.Type = ProgramTypeNoData
 		tokens = tokens[0 : len(tokens)-1]
 	} else {
-		program.Type = ProgramTypeNormal
+		p.Type = ProgramTypeNormal
 	}
 
-	program.Name = strings.Join(tokens, " ")
+	p.Name = strings.Join(tokens, " ")
 
 	return nil
 }
+
+type ProgramList []Program
 
 type Channel struct {
 	Number     int
 	Frequency  uint32
 	Modulation string
 	Name       string
+	TSID       int
+	ONID       int
 	Programs   []Program
+}
+
+func (c *Channel) UnmarshalText(text []byte) (err error) {
+	reader := bufio.NewReader(bytes.NewBuffer(text))
+	var line []byte
+	var isPrefix bool
+	for err == nil {
+		line, isPrefix, err = reader.ReadLine()
+		if isPrefix {
+			return ErrParseError("The program line was too long")
+		}
+
+		n := 0
+		if n, err = fmt.Sscanf(string(line), "tsid=0x%x", &c.TSID); n == 1 {
+			continue
+		}
+
+		if n, err = fmt.Sscanf(string(line), "onid=0x%x", &c.ONID); n == 1 {
+			continue
+		}
+
+		p := &Program{}
+		err = p.UnmarshalText(line)
+		if err == nil {
+			c.Programs = append(c.Programs, *p)
+		}
+	}
+	return nil
+}
+
+func (c *Channel) TSIDDetected() bool {
+	return c.TSID >= 0
+}
+
+func (c *Channel) ONIDDetected() bool {
+	return c.ONID >= 0
 }
 
 type channelRange struct {
@@ -113,6 +156,8 @@ func (cr channelRange) channels(txCh chan Channel) {
 			Frequency:  channelFrequencyRoundNormal(cr.Frequency + (uint32(i-cr.Start) * cr.Spacing)),
 			Modulation: "auto",
 			Name:       fmt.Sprintf("%d", i),
+			TSID:       -1,
+			ONID:       -1,
 		}
 	}
 }

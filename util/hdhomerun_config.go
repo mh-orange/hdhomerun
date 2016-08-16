@@ -97,7 +97,10 @@ func main() {
 			tuner := device.Tuner(0)
 			for channel := range tuner.Scan() {
 				fmt.Printf("Channel %d\n", channel.Frequency)
-				fmt.Printf("\tStreaminfo: %s", channel.StreamInfo)
+				fmt.Printf("\tTSID: %d ONID: %d\n", channel.TSID, channel.ONID)
+				for _, program := range channel.Programs {
+					fmt.Printf("\t%s\n", program.Name)
+				}
 			}
 		case "save":
 			fmt.Printf("Not implemented\n")
