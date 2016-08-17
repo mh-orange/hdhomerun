@@ -9,9 +9,7 @@ import (
 type TunerStatus struct {
 	Channel              string
 	LockStr              string
-	SignalPresent        bool
 	LockSupported        bool
-	LockUnsupported      bool
 	SignalStrength       int
 	SignalToNoiseQuality int
 	SymbolErrorQuality   int
@@ -65,17 +63,16 @@ func (ts *TunerStatus) UnmarshalText(text []byte) (err error) {
 	}
 
 	if err == nil {
-		ts.SignalPresent = ts.SignalStrength >= 45
 		if ts.LockStr != "none" {
-			if ts.LockStr[0] == '(' {
-				ts.LockUnsupported = true
-			} else {
-				ts.LockSupported = true
-			}
+			ts.LockSupported = true
 		}
 	}
 
 	return
+}
+
+func (ts *TunerStatus) SignalPresent() bool {
+	return ts.SignalStrength >= 45
 }
 
 type Tuner struct {
@@ -108,7 +105,9 @@ func (t *Tuner) Status() (*TunerStatus, error) {
 	return status, err
 }
 
-func (t *Tuner) WaitForLock() (status *TunerStatus, err error) {
+func (t *Tuner) WaitForLock() (err error) {
+	var status *TunerStatus
+
 	time.Sleep(250 * time.Millisecond)
 	timeout := time.Now().Add(2500 * time.Millisecond)
 
@@ -118,14 +117,16 @@ func (t *Tuner) WaitForLock() (status *TunerStatus, err error) {
 			break
 		}
 
-		// TODO: this logic doesn't make sense to me, but it's how it's done in
-		// the SiliconDust libhdhomerun.  Need to try and learn what the meaning
-		// of this logic is... maybe contact SiliconDust about it
-		if !status.SignalPresent || status.LockSupported || status.LockUnsupported {
+		if !status.SignalPresent() {
+			err = ErrNoSignal
+			break
+		} else if status.LockSupported {
+			err = ErrLockNotSupported
 			break
 		}
 
 		if time.Now().After(timeout) {
+			err = ErrTimeout
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
@@ -156,14 +157,16 @@ func (t *Tuner) Scan() chan Channel {
 				}
 				visited[channel.Frequency] = true
 				t.Tune(channel)
-				status, err := t.WaitForLock()
+				err := t.WaitForLock()
 				if err != nil {
-					Logger.Printf("Error waiting for lock: %v", err)
-				} else if !status.LockSupported {
+					if err != ErrLockNotSupported && err != ErrNoSignal {
+						Logger.Printf("Error waiting for lock: %v", err)
+					}
 					continue
 				}
 
 				timeout := time.Now().Add(5 * time.Second)
+				var status *TunerStatus
 				for {
 					status, err = t.Status()
 					if err != nil {

@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+var (
+	ErrTimeout          = fmt.Errorf("Timeout")
+	ErrNoSignal         = fmt.Errorf("Signal Strength Too Low")
+	ErrLockNotSupported = fmt.Errorf("Channel Lock is not Supported")
+)
+
 type ErrParseError string
 
 func (e ErrParseError) Error() string {
