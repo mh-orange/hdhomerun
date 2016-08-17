@@ -39,15 +39,19 @@ func deviceFromId(id string) (*hdhomerun.Device, error) {
 		}
 	}
 
-	devices, err := hdhomerun.Discover(ip, time.Millisecond*200)
-	for device := range devices {
+	for discoverResult := range hdhomerun.Discover(ip, time.Millisecond*200) {
+		if discoverResult.Err != nil {
+			return discoverResult.Device, discoverResult.Err
+		}
+
+		device := discoverResult.Device
 		if ip != nil || device.ID() == id {
 			device.Connect()
-			return device, err
+			return device, nil
 		}
 	}
 
-	return nil, err
+	return nil, nil
 }
 
 func main() {
@@ -56,14 +60,12 @@ func main() {
 	}
 
 	if os.Args[1] == "discover" {
-		devices, err := hdhomerun.Discover(nil, time.Millisecond*200)
-		if err != nil {
-			fmt.Printf("Discovery failed: %v\n", err)
-			os.Exit(1)
-		}
-
-		for device := range devices {
-			fmt.Printf("hdhomerun device %s found at %s\n", device.ID(), device.Addr)
+		for discoverResult := range hdhomerun.Discover(nil, time.Millisecond*200) {
+			if discoverResult.Err != nil {
+				fmt.Printf("Error during discovery: %v\n", discoverResult.Err)
+			} else {
+				fmt.Printf("hdhomerun device %s found at %s\n", discoverResult.Device.ID(), discoverResult.Device.RemoteAddr())
+			}
 		}
 	} else {
 		device, err := deviceFromId(os.Args[1])

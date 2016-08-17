@@ -8,6 +8,7 @@ import (
 type Connection interface {
 	Send(*Packet) error
 	Recv() (*Packet, error)
+	RemoteAddr() net.Addr
 }
 
 type Connectable interface {
@@ -36,6 +37,10 @@ func (conn *IOConnection) Send(p *Packet) error {
 
 func (conn *IOConnection) Recv() (p *Packet, err error) {
 	return conn.decoder.Next()
+}
+
+func (conn *IOConnection) RemoteAddr() net.Addr {
+	return nil
 }
 
 type TCPConnection struct {
