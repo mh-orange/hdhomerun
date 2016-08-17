@@ -4,6 +4,13 @@ import (
 	"testing"
 )
 
+func TestParseError(t *testing.T) {
+	err := ErrParseError("this is a parse error")
+	if err.Error() != "this is a parse error" {
+		t.Errorf("Expected 'this is a parse error' got '%s'", err.Error())
+	}
+}
+
 func TestWrongPacketType(t *testing.T) {
 	err := wrongPacketType(TypeDiscoverReq, TypeDiscoverRpy)
 	expected := "Expected packet type Discover Request but got Discover Reply"

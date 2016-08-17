@@ -5,57 +5,54 @@ import (
 	"encoding/hex"
 	"io"
 	"net"
+	"sync"
 	"time"
 )
 
 type Device struct {
 	Connection
-	id   []byte
-	e    *Encoder
-	d    *Decoder
-	Addr string
+	id []byte
 }
 
-type discoverConn interface {
-	Close() error
-	ReadFrom([]byte) (int, net.Addr, error)
-	SetReadDeadline(time.Time) error
-	WriteTo([]byte, net.Addr) (int, error)
+type DiscoverResult struct {
+	Device *Device
+	Err    error
 }
 
-var listenUDP = func() (discoverConn, error) {
-	return net.ListenUDP("udp", nil)
-}
+func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-func Discover(ip net.IP, timeout time.Duration) (chan *Device, error) {
+	ch := make(chan DiscoverResult, 1)
 	if ip == nil {
 		ip = net.IPv4bcast
 	}
 
-	conn, err := listenUDP()
+	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
-		return nil, err
+		ch <- DiscoverResult{nil, err}
+		return ch
 	}
 
-	devices := make(chan *Device, 10)
 	go func() {
+		defer close(ch)
+
 		buffer := make([]byte, 1500)
 		readBuffer := bytes.NewBuffer(make([]byte, 1500))
 		readBuffer.Reset()
 		decoder := NewDecoder(readBuffer)
 		discovered := make(map[string]bool)
-		defer close(devices)
 
 		end := time.Now().Add(timeout)
 		for t := time.Now(); t.Before(end); t = time.Now() {
 			conn.SetReadDeadline(time.Now().Add(timeout))
 
-			n, addr, err := conn.ReadFrom(buffer)
+			n, addr, err := conn.ReadFromUDP(buffer)
 			if err != nil {
 				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
 					continue
 				} else if err != io.EOF {
-					Logger.Printf("1) %v", err)
+					ch <- DiscoverResult{nil, err}
 				}
 				break
 			}
@@ -64,7 +61,7 @@ func Discover(ip net.IP, timeout time.Duration) (chan *Device, error) {
 			p, err := decoder.Next()
 
 			if err != nil {
-				Logger.Printf("%v", err)
+				ch <- DiscoverResult{nil, err}
 				break
 			}
 
@@ -73,11 +70,17 @@ func Discover(ip net.IP, timeout time.Duration) (chan *Device, error) {
 			}
 
 			if _, found := discovered[addr.String()]; !found {
-				devices <- NewDevice(NewTCPConnection(addr.String()), p.Tags[TagDeviceId].Value, addr.String())
+				ch <- DiscoverResult{
+					Device: NewDevice(NewTCPConnection(&net.TCPAddr{addr.IP, addr.Port, addr.Zone}), p.Tags[TagDeviceId].Value),
+					Err:    nil,
+				}
 			}
 			discovered[addr.String()] = true
 		}
 		conn.Close()
+		// Wait on the sender go routine so that we don't close the result
+		// channel before it's done and cause a panic
+		wg.Wait()
 	}()
 
 	writeBuffer := bytes.NewBuffer([]byte{})
@@ -88,23 +91,25 @@ func Discover(ip net.IP, timeout time.Duration) (chan *Device, error) {
 				TagDeviceType: DeviceTypeTuner,
 				TagDeviceId:   DeviceIdWildcard,
 			}))
+
 			if err == nil {
 				_, err = conn.WriteTo(writeBuffer.Bytes(), &net.UDPAddr{IP: ip, Port: 65001})
 			}
+
 			if err != nil {
-				Logger.Printf("Failed to send discovery packet: %v", err)
+				ch <- DiscoverResult{nil, err}
 			}
 		}
+		wg.Done()
 	}()
 
-	return devices, nil
+	return ch
 }
 
-func NewDevice(conn Connection, id []byte, addr string) *Device {
+func NewDevice(conn Connection, id []byte) *Device {
 	return &Device{
 		Connection: conn,
 		id:         id,
-		Addr:       addr,
 	}
 }
 
@@ -113,6 +118,7 @@ func (d *Device) ID() string {
 }
 
 func (d *Device) getset(name string, value *string) (resp TagValue, err error) {
+	err = d.Connect()
 	tags := make(map[TagType]TagValue)
 	tags[TagGetSetName] = TagValue(name)
 
@@ -120,7 +126,10 @@ func (d *Device) getset(name string, value *string) (resp TagValue, err error) {
 		tags[TagGetSetValue] = TagValue(*value)
 	}
 
-	err = d.Send(NewPacket(TypeGetSetReq, tags))
+	if err == nil {
+		err = d.Send(NewPacket(TypeGetSetReq, tags))
+	}
+
 	if err == nil {
 		var p *Packet
 		p, err = d.Recv()
@@ -146,4 +155,18 @@ func (d *Device) Set(name, value string) (TagValue, error) {
 
 func (d *Device) Tuner(n int) *Tuner {
 	return newTuner(d, n)
+}
+
+func (d *Device) Connect() error {
+	if conn, ok := d.Connection.(Connectable); ok {
+		return conn.Connect()
+	}
+	return nil
+}
+
+func (d *Device) Close() error {
+	if conn, ok := d.Connection.(Closeable); ok {
+		return conn.Close()
+	}
+	return nil
 }

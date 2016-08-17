@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 )
@@ -16,6 +17,21 @@ const (
 	ProgramTypeControl
 	ProgramTypeEncrypted
 )
+
+func (pt ProgramType) String() string {
+	switch pt {
+	case ProgramTypeNormal:
+		return "normal"
+	case ProgramTypeNoData:
+		return "no data"
+	case ProgramTypeControl:
+		return "control"
+	case ProgramTypeEncrypted:
+		return "encrypted"
+	default:
+		return "unknown"
+	}
+}
 
 type Program struct {
 	Name         string
@@ -40,7 +56,7 @@ func (p *Program) UnmarshalText(value TagValue) (err error) {
 	if i != -1 {
 		p.VirtualMajor, err = parseInt(tokens[0][0:i])
 		if err == nil {
-			p.VirtualMinor, err = parseInt(tokens[0][i:])
+			p.VirtualMinor, err = parseInt(tokens[0][i+1:])
 		}
 	} else {
 		p.VirtualMajor, err = parseInt(tokens[0])
@@ -61,9 +77,9 @@ func (p *Program) UnmarshalText(value TagValue) (err error) {
 	} else if tokens[len(tokens)-1] == "(encrypted)" {
 		p.Type = ProgramTypeEncrypted
 		tokens = tokens[0 : len(tokens)-1]
-	} else if tokens[len(tokens)-1] == "(no data)" {
+	} else if len(tokens) >= 2 && strings.Join(tokens[len(tokens)-2:], " ") == "(no data)" {
 		p.Type = ProgramTypeNoData
-		tokens = tokens[0 : len(tokens)-1]
+		tokens = tokens[0 : len(tokens)-2]
 	} else {
 		p.Type = ProgramTypeNormal
 	}
@@ -71,6 +87,20 @@ func (p *Program) UnmarshalText(value TagValue) (err error) {
 	p.Name = strings.Join(tokens, " ")
 
 	return nil
+}
+
+func (p *Program) MarshalText() ([]byte, error) {
+	str := ""
+	if p.VirtualMinor != 0 {
+		str = fmt.Sprintf("%d: %d.%d %s", p.Number, p.VirtualMajor, p.VirtualMinor, p.Name)
+	} else {
+		str = fmt.Sprintf("%d: %d %s", p.Number, p.VirtualMajor, p.Name)
+	}
+
+	if p.Type != ProgramTypeNormal {
+		str += fmt.Sprintf(" (%s)", p.Type.String())
+	}
+	return []byte(str), nil
 }
 
 type ProgramList []Program
@@ -91,16 +121,20 @@ func (c *Channel) UnmarshalText(text []byte) (err error) {
 	var isPrefix bool
 	for err == nil {
 		line, isPrefix, err = reader.ReadLine()
+		if err != nil {
+			break
+		}
+
 		if isPrefix {
 			return ErrParseError("The program line was too long")
 		}
 
 		n := 0
-		if n, err = fmt.Sscanf(string(line), "tsid=0x%x", &c.TSID); n == 1 {
+		if n, _ = fmt.Sscanf(string(line), "tsid=0x%x", &c.TSID); n == 1 {
 			continue
 		}
 
-		if n, err = fmt.Sscanf(string(line), "onid=0x%x", &c.ONID); n == 1 {
+		if n, _ = fmt.Sscanf(string(line), "onid=0x%x", &c.ONID); n == 1 {
 			continue
 		}
 
@@ -110,7 +144,11 @@ func (c *Channel) UnmarshalText(text []byte) (err error) {
 			c.Programs = append(c.Programs, *p)
 		}
 	}
-	return nil
+
+	if err == io.EOF {
+		err = nil
+	}
+	return
 }
 
 func (c *Channel) TSIDDetected() bool {

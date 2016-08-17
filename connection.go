@@ -6,9 +6,15 @@ import (
 )
 
 type Connection interface {
-	Connect() error
-	Send(p *Packet) error
+	Send(*Packet) error
 	Recv() (*Packet, error)
+}
+
+type Connectable interface {
+	Connect() error
+}
+
+type Closeable interface {
 	Close() error
 }
 
@@ -35,25 +41,19 @@ func (conn *IOConnection) Recv() (p *Packet, err error) {
 type TCPConnection struct {
 	*net.TCPConn
 	*IOConnection
-	address string
+	addr *net.TCPAddr
 }
 
-func NewTCPConnection(address string) Connection {
-	conn := &TCPConnection{
-		address: address,
+func NewTCPConnection(addr *net.TCPAddr) *TCPConnection {
+	return &TCPConnection{
+		addr: addr,
 	}
-
-	conn.IOConnection = NewIOConnection(conn)
-	return conn
 }
 
 func (conn *TCPConnection) Connect() (err error) {
-	if conn.TCPConn == nil {
-		var addr *net.TCPAddr
-		addr, err = net.ResolveTCPAddr("tcp", conn.address)
-		if err == nil {
-			conn.TCPConn, err = net.DialTCP("tcp", nil, addr)
-		}
+	conn.TCPConn, err = net.DialTCP("tcp", nil, conn.addr)
+	if err == nil {
+		conn.IOConnection = NewIOConnection(conn.TCPConn)
 	}
-	return
+	return err
 }

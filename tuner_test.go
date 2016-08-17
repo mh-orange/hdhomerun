@@ -103,15 +103,15 @@ func TestUnmarshalStatus(t *testing.T) {
 }
 
 func TestStatus(t *testing.T) {
-	device, mock := newTestDevice()
-	mock.reader.Encode(statusRpy.p)
+	device := newTestDevice()
+	device.Send(statusRpy.p)
 
 	tuner := device.Tuner(0)
 	_, err := tuner.Status()
 	if err != nil {
 		t.Errorf("Did not expect an error but got %v", err)
 	}
-	received, _ := mock.writer.Next()
+	received, _ := device.Recv()
 	if !reflect.DeepEqual(statusReq.p, received) {
 		t.Errorf("Expected request packet:\n%s\nGot:\n%s", statusReq.p.Dump(), received.Dump())
 	}

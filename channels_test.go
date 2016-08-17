@@ -2,6 +2,8 @@ package hdhomerun
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -284,11 +286,6 @@ func TestChannelMapChannels(t *testing.T) {
 	for channel := range Channels("us-cable") {
 		received[channel.Frequency] = channel
 	}
-	/*for _, cr := range ChannelMapTable["us-cable"] {
-		for _, channel := range cr.Channels() {
-			received[channel.Frequency] = channel
-		}
-	}*/
 
 	for frequency, expChannel := range expected {
 		if rxChannel, found := received[frequency]; found {
@@ -306,4 +303,210 @@ func TestChannelMapChannels(t *testing.T) {
 		}
 	}
 
+}
+
+func TestMarshallingProgram(t *testing.T) {
+	tests := []struct {
+		str         string
+		expected    *Program
+		expectedErr reflect.Type
+	}{
+		{
+			str: "735: 695 Comedy.TV HD (encrypted)",
+			expected: &Program{
+				Name:         "Comedy.TV HD",
+				Type:         ProgramTypeEncrypted,
+				Number:       735,
+				VirtualMajor: 695,
+				VirtualMinor: 0,
+			},
+		}, {
+			str: "735: 695.5 Comedy.TV HD (encrypted)",
+			expected: &Program{
+				Name:         "Comedy.TV HD",
+				Type:         ProgramTypeEncrypted,
+				Number:       735,
+				VirtualMajor: 695,
+				VirtualMinor: 5,
+			},
+		}, {
+			str: "735: 695 Comedy.TV HD (It's Great!) (encrypted)",
+			expected: &Program{
+				Name:         "Comedy.TV HD (It's Great!)",
+				Type:         ProgramTypeEncrypted,
+				Number:       735,
+				VirtualMajor: 695,
+				VirtualMinor: 0,
+			},
+		}, {
+			str: "735: 695 Comedy.TV HD (It's Great!) (control)",
+			expected: &Program{
+				Name:         "Comedy.TV HD (It's Great!)",
+				Type:         ProgramTypeControl,
+				Number:       735,
+				VirtualMajor: 695,
+				VirtualMinor: 0,
+			},
+		}, {
+			str: "735: 695 Comedy.TV HD (It's Great!) (no data)",
+			expected: &Program{
+				Name:         "Comedy.TV HD (It's Great!)",
+				Type:         ProgramTypeNoData,
+				Number:       735,
+				VirtualMajor: 695,
+				VirtualMinor: 0,
+			},
+		}, {
+			str: "735: 695 Comedy.TV HD (It's Great!)",
+			expected: &Program{
+				Name:         "Comedy.TV HD (It's Great!)",
+				Type:         ProgramTypeNormal,
+				Number:       735,
+				VirtualMajor: 695,
+				VirtualMinor: 0,
+			},
+		}, {
+			str:         "",
+			expected:    nil,
+			expectedErr: reflect.TypeOf(ErrParseError("")),
+		}, {
+			str:         "a: 695",
+			expected:    nil,
+			expectedErr: reflect.TypeOf(&strconv.NumError{}),
+		}, {
+			str:         "1: b",
+			expected:    nil,
+			expectedErr: reflect.TypeOf(&strconv.NumError{}),
+		}, {
+			str:         "1: 695",
+			expected:    nil,
+			expectedErr: reflect.TypeOf(ErrParseError("")),
+		},
+	}
+
+	for _, test := range tests {
+		p := &Program{}
+		err := p.UnmarshalText([]byte(test.str))
+		if err != nil {
+			if reflect.TypeOf(err) != test.expectedErr {
+				t.Errorf("Expected %v but got %v", test.expectedErr, err)
+			}
+			continue
+		}
+
+		if !reflect.DeepEqual(p, test.expected) {
+			t.Errorf("Expected\n%v\nReceived:\n%v\n", test.expected, p)
+		}
+
+		b, _ := p.MarshalText()
+		if !reflect.DeepEqual([]byte(test.str), b) {
+			t.Errorf("Marshaling failed.  Expected:\n%s\nReceived\n%s\n", test.str, string(b))
+		}
+	}
+}
+
+func TestUnmarshalChannel(t *testing.T) {
+	tests := []struct {
+		str          string
+		expected     *Channel
+		expectedErr  reflect.Type
+		tsidDetected bool
+		onidDetected bool
+	}{
+		{
+			str: "735: 695 Comedy.TV HD (encrypted)\n736: 599 Cars.TV HD (encrypted)\ntsid=0x0001\n",
+			expected: &Channel{
+				TSID: 1,
+				ONID: -1,
+				Programs: []Program{
+					Program{
+						Number:       735,
+						VirtualMajor: 695,
+						Name:         "Comedy.TV HD",
+						Type:         ProgramTypeEncrypted,
+					},
+					Program{
+						Number:       736,
+						VirtualMajor: 599,
+						Name:         "Cars.TV HD",
+						Type:         ProgramTypeEncrypted,
+					},
+				},
+			},
+			tsidDetected: true,
+		}, {
+			str: "onid=0x0001\n",
+			expected: &Channel{
+				TSID:     -1,
+				ONID:     1,
+				Programs: nil,
+			},
+			onidDetected: true,
+		}, {
+			str: strings.Repeat("S", 4097),
+			expected: &Channel{
+				TSID:     -1,
+				ONID:     -1,
+				Programs: nil,
+			},
+			expectedErr: reflect.TypeOf(ErrParseError("")),
+		},
+	}
+
+	for _, test := range tests {
+		c := &Channel{
+			ONID: -1,
+			TSID: -1,
+		}
+
+		err := c.UnmarshalText([]byte(test.str))
+		if err != nil {
+			if reflect.TypeOf(err) != test.expectedErr {
+				t.Errorf("Expected %v but got %v", test.expectedErr, err)
+			}
+			continue
+		}
+
+		if !reflect.DeepEqual(c, test.expected) {
+			t.Errorf("Expected\n%v\nReceived:\n%v\n", test.expected, c)
+		}
+
+		if c.TSIDDetected() != test.tsidDetected {
+			t.Errorf("Expected TSIDDetected to be %v but got %v", test.tsidDetected, c.TSIDDetected())
+		}
+
+		if c.ONIDDetected() != test.onidDetected {
+			t.Errorf("Expected ONIDDetected to be %v but got %v", test.onidDetected, c.ONIDDetected())
+		}
+	}
+}
+
+func TestChannelTypeString(t *testing.T) {
+	tests := []struct {
+		t        ProgramType
+		expected string
+	}{
+		{
+			t:        ProgramTypeNormal,
+			expected: "normal",
+		}, {
+			t:        ProgramTypeNoData,
+			expected: "no data",
+		}, {
+			t:        ProgramTypeControl,
+			expected: "control",
+		}, {
+			t:        ProgramTypeEncrypted,
+			expected: "encrypted",
+		}, {
+			t:        ProgramType(-1),
+			expected: "unknown",
+		},
+	}
+
+	for _, test := range tests {
+		if test.t.String() != test.expected {
+			t.Errorf("Expected %s got %s", test.expected, test.t.String())
+		}
+	}
 }

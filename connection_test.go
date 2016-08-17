@@ -1,104 +1,52 @@
 package hdhomerun
 
 import (
-	"bytes"
 	"net"
 	"reflect"
+	"sync"
 	"testing"
-	"time"
 )
 
-type mockStreamConnection struct {
-	reader *bytes.Buffer
-	writer *bytes.Buffer
-}
-
-func (s *mockStreamConnection) Read(b []byte) (int, error) {
-	return s.reader.Read(b)
-}
-
-func (s *mockStreamConnection) Write(b []byte) (int, error) {
-	return s.writer.Write(b)
-}
-
-func newMockStreamConnection() *mockStreamConnection {
-	return &mockStreamConnection{
-		reader: &bytes.Buffer{},
-		writer: &bytes.Buffer{},
-	}
-}
-
-type mockConnection struct {
-	*IOConnection
-	*mockStreamConnection
-	reader  *Encoder
-	writer  *Decoder
-	readErr error
-}
-
-func newMockConnection() *mockConnection {
-	rw := newMockStreamConnection()
-
-	return &mockConnection{
-		IOConnection:         NewIOConnection(rw),
-		mockStreamConnection: rw,
-		reader:               NewEncoder(rw.reader),
-		writer:               NewDecoder(rw.writer),
-	}
-}
-
-func (conn *mockConnection) Connect() error {
-	return nil
-}
-
-func (conn *mockConnection) Close() error {
-	return nil
-}
-
-type mockDiscoverConn struct {
-	*mockConnection
-}
-
-func newMockDiscoverConn() *mockDiscoverConn {
-	return &mockDiscoverConn{newMockConnection()}
-}
-
-func (conn *mockDiscoverConn) ReadFrom(b []byte) (int, net.Addr, error) {
-	if conn.readErr != nil {
-		return 0, nil, conn.readErr
-	}
-	n, err := conn.mockConnection.Read(b)
-	return n, testAddr("test address"), err
-}
-
-func (conn *mockDiscoverConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	return conn.mockConnection.Write(b)
-}
-
-func (conn *mockDiscoverConn) SetReadDeadline(time.Time) error {
-	return nil
-}
-
-func TestIOSend(t *testing.T) {
-	conn := newMockConnection()
-	conn.Send(discoverReq.p)
-	received, _ := conn.writer.Next()
-	if !reflect.DeepEqual(discoverReq.p, received) {
-		t.Errorf("Expected:\n%s\nGot:\n%s\n", discoverReq.p.Dump(), received.Dump())
-	}
-}
-
-/*func TestTcpConnectionsSend(t *testing.T) {
-	rwc := newTestReadWriteCloser()
-	dialTCP = func(net string, laddr, raddr *net.TCPAddr) (io.ReadWriteCloser, error) {
-		return rwc, nil
+func TestTCPConnection(t *testing.T) {
+	tests := []struct {
+		txPackets []*Packet
+		rxPackets []*Packet
+	}{
+		{
+			txPackets: []*Packet{getReq.p},
+			rxPackets: []*Packet{getRpy.p},
+		},
 	}
 
-	conn := NewTcpConnection(nil, 0)
-	conn.Send(getReq.p)
+	for _, test := range tests {
+		var wg sync.WaitGroup
+		listener, _ := net.ListenTCP("tcp", &net.TCPAddr{net.IP{127, 0, 0, 1}, 65001, ""})
 
-	received := rwc.writer.Bytes()
-	if !bytes.Equal(received, getReq.b) {
-		t.Errorf("Expected:\n%v\nGot:\n%v\n", hex.Dump(getReq.b), hex.Dump(received))
+		wg.Add(1)
+		go func() {
+			conn, _ := listener.Accept()
+			io := NewIOConnection(conn)
+			for i, expectedTx := range test.txPackets {
+				receivedTx, _ := io.Recv()
+				if !reflect.DeepEqual(expectedTx, receivedTx) {
+					t.Errorf("Expected:\n%s\nGot:\n%s\n", expectedTx.Dump(), receivedTx.Dump())
+				}
+				io.Send(test.rxPackets[i])
+			}
+			conn.Close()
+			wg.Done()
+		}()
+
+		d := NewDevice(NewTCPConnection(&net.TCPAddr{net.IP{127, 0, 0, 1}, 65001, ""}), []byte{1, 2, 3, 4})
+		d.Connect()
+		for i, expectedRx := range test.rxPackets {
+			d.Send(test.txPackets[i])
+			receivedRx, _ := d.Recv()
+			if !reflect.DeepEqual(expectedRx, receivedRx) {
+				t.Errorf("Expected:\n%s\nGot:\n%s\n", expectedRx.Dump(), receivedRx.Dump())
+			}
+		}
+		d.Close()
+		wg.Wait()
 	}
-}*/
+}

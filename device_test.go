@@ -2,75 +2,95 @@ package hdhomerun
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
+	"net"
 	"reflect"
 	"testing"
 	"time"
 )
 
-type testAddr string
-
-func (t testAddr) Network() string {
-	return string(t)
+type testConnection struct {
+	*IOConnection
 }
 
-func (t testAddr) String() string {
-	return string(t)
-}
-
-func newTestDevice() (*Device, *mockConnection) {
-	mock := newMockConnection()
-	return NewDevice(mock, []byte{0x01, 0x02, 0x03, 0x04}, "test address"), mock
-}
-
-func TestID(t *testing.T) {
-	d, _ := newTestDevice()
-	if d.ID() != "01020304" {
-		t.Errorf("Expected ID to be %s but got %s", "01020304", d.ID())
+func newTestConnection() *testConnection {
+	return &testConnection{
+		IOConnection: NewIOConnection(&bytes.Buffer{}),
 	}
 }
 
-func TestReceivedWrongPacketType(t *testing.T) {
-	d, mock := newTestDevice()
-	mock.reader.Encode(discoverRpy.p)
-	_, err := d.Get("help")
-	if _, ok := err.(ErrWrongPacketType); !ok {
-		t.Errorf("Expected error ErrWrongPacketType but got %T", err)
+func newTestDevice() *Device {
+	return &Device{
+		id:         []byte{0x01, 0x02, 0x03, 0x04},
+		Connection: newTestConnection(),
 	}
+
 }
 
-func TestReceivedRemoteError(t *testing.T) {
-	d, mock := newTestDevice()
-	mock.reader.Encode(getRpyErr.p)
-	_, err := d.Get("help")
-	if _, ok := err.(ErrRemoteError); !ok {
-		t.Errorf("Expected error ErrREmoteError but got %T", err)
+func TestGetSet(t *testing.T) {
+	tests := []struct {
+		name          string
+		value         string
+		reply         *Packet
+		expectedValue TagValue
+		expectedErr   reflect.Type
+	}{
+		{
+			name:          "help",
+			reply:         getRpy.p,
+			expectedValue: getRpy.p.Tags[TagGetSetValue].Value,
+		}, {
+			name:          "/tuner0/channel",
+			value:         "auto:849000000",
+			reply:         setRpy.p,
+			expectedValue: setRpy.p.Tags[TagGetSetValue].Value,
+		}, {
+			name:          "help",
+			reply:         discoverRpy.p,
+			expectedValue: setRpy.p.Tags[TagGetSetValue].Value,
+			expectedErr:   reflect.TypeOf(ErrWrongPacketType("")),
+		}, {
+			name:        "help",
+			reply:       getRpyErr.p,
+			expectedErr: reflect.TypeOf(ErrRemoteError("")),
+		},
 	}
-}
 
-func TestGet(t *testing.T) {
-	d, mock := newTestDevice()
-	mock.reader.Encode(getRpy.p)
-	value, _ := d.Get("help")
-	if !bytes.Equal(value, getRpy.p.Tags[TagGetSetValue].Value) {
-		t.Errorf("Device get failed.\nExpected:\n%s\nReceived:\n%s\n", getRpy.p.Tags[TagGetSetValue].String(), value)
-	}
-}
+	for _, test := range tests {
+		d := newTestDevice()
+		d.Send(test.reply)
 
-func TestSet(t *testing.T) {
-	d, mock := newTestDevice()
-	mock.reader.Encode(setRpy.p)
-	d.Set("/tuner0/channel", "auto:849000000")
-	expected := NewPacket(TypeGetSetReq, map[TagType]TagValue{TagGetSetName: TagValue("/tuner0/channel"), TagGetSetValue: TagValue("auto:849000000")})
-	received, _ := mock.writer.Next()
-	if !reflect.DeepEqual(received, expected) {
-		t.Errorf("Expected packet to be:\n%s\nBut got:\n%s\n", expected.Dump(), received.Dump())
+		var value TagValue
+		var err error
+		if test.value == "" {
+			value, err = d.Get(test.name)
+		} else {
+			value, err = d.Set(test.name, test.value)
+		}
+
+		if reflect.TypeOf(err) != test.expectedErr {
+			t.Errorf("Expected error %v but got %v", test.expectedErr, reflect.TypeOf(err))
+		}
+
+		if err != nil {
+			continue
+		}
+
+		if !reflect.DeepEqual(value, test.expectedValue) {
+			t.Errorf("Expected return value of %s but got %s", test.expectedValue, value)
+		}
+
+		err = d.Close()
+		if err != nil {
+			t.Errorf("Expected no error but got %v", err)
+		}
 	}
 }
 
 func TestTuner(t *testing.T) {
 	// this is almost ridiculous
-	d, _ := newTestDevice()
+	d := newTestDevice()
 	tuner := d.Tuner(1)
 	if tuner.n != 1 {
 		t.Errorf("Expected tuner number to be 1 but got %d", tuner.n)
@@ -81,84 +101,53 @@ func TestTuner(t *testing.T) {
 	}
 }
 
-func TestDiscovery(t *testing.T) {
-	conn := newMockDiscoverConn()
-	listenUDP = func() (discoverConn, error) {
-		return conn, nil
+func TestDiscover(t *testing.T) {
+	tests := []struct {
+		reply   testPacket
+		devices []string
+		err     reflect.Type
+	}{
+		{
+			reply:   discoverRpy,
+			devices: []string{hex.EncodeToString(discoverRpy.p.Tags[TagDeviceId].Value)},
+		}, {
+			reply:   discoverReq,
+			devices: []string{},
+		}, {
+			reply: testPacket{
+				p: nil,
+				b: []byte{
+					0x00,
+				},
+			},
+			devices: []string{},
+			err:     reflect.TypeOf(fmt.Errorf("")),
+		},
 	}
 
-	conn.reader.Encode(discoverRpy.p)
-	count := 0
-	devices, _ := Discover(nil, time.Millisecond*100)
-	for range devices {
-		count++
-	}
+	for _, test := range tests {
+		listener, _ := net.ListenUDP("udp", &net.UDPAddr{IP: net.IP{127, 0, 0, 1}, Port: 65001})
+		go func() {
+			listener.SetReadDeadline(time.Now().Add(time.Second))
+			_, addr, _ := listener.ReadFromUDP(make([]byte, 1024))
+			listener.WriteTo(test.reply.b, addr)
+			listener.Close()
+		}()
 
-	if count != 1 {
-		t.Errorf("Expected to discover one device but got %d", count)
-	}
-}
+		devices := make([]string, 0)
+		for result := range Discover(net.IP{127, 0, 0, 1}, time.Second) {
+			if reflect.TypeOf(result.Err) != test.err {
+				t.Errorf("Expected error type %v but got %v(%v)", test.err, reflect.TypeOf(result.Err), result.Err)
+			}
 
-func TestDiscoveryWrongPacket(t *testing.T) {
-	conn := newMockDiscoverConn()
-	listenUDP = func() (discoverConn, error) {
-		return conn, nil
-	}
+			if result.Err != nil {
+				continue
+			}
+			devices = append(devices, result.Device.ID())
+		}
 
-	conn.reader.Encode(discoverReq.p)
-	count := 0
-	devices, _ := Discover(nil, time.Millisecond*100)
-	for range devices {
-		count++
-	}
-
-	if count != 0 {
-		t.Errorf("Expected to discover no devices but got %d", count)
-	}
-}
-
-type errTimeout string
-
-func (e errTimeout) Timeout() bool {
-	return true
-}
-
-func (e errTimeout) Temporary() bool {
-	return false
-}
-
-func (e errTimeout) Error() string {
-	return string(e)
-}
-
-func TestDiscoveryConnecionError(t *testing.T) {
-	expectedErr := fmt.Errorf("connection error")
-	listenUDP = func() (discoverConn, error) {
-		return nil, expectedErr
-	}
-
-	_, err := Discover(nil, time.Millisecond*100)
-
-	if err != expectedErr {
-		t.Errorf("Expected error to be %v but got %v", expectedErr, err)
-	}
-}
-
-func TestDiscoveryTimeout(t *testing.T) {
-	conn := newMockDiscoverConn()
-	conn.readErr = errTimeout("timeout")
-
-	listenUDP = func() (discoverConn, error) {
-		return conn, nil
-	}
-	count := 0
-
-	devices, _ := Discover(nil, time.Millisecond*100)
-	for range devices {
-		count++
-	}
-
-	if count != 0 {
-		t.Errorf("Expected to discover no devices but got %d", count)
+		if !reflect.DeepEqual(devices, test.devices) {
+			t.Errorf("Expected devices %v but got %v", test.devices, devices)
+		}
 	}
 }
