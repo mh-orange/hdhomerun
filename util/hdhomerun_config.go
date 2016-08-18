@@ -64,7 +64,7 @@ func main() {
 			if discoverResult.Err != nil {
 				fmt.Printf("Error during discovery: %v\n", discoverResult.Err)
 			} else {
-				fmt.Printf("hdhomerun device %s found at %s\n", discoverResult.Device.ID(), discoverResult.Device.RemoteAddr())
+				fmt.Printf("hdhomerun device %s found at %s\n", discoverResult.Device.ID(), discoverResult.Device.Addr())
 			}
 		}
 	} else {
