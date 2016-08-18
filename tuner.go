@@ -134,8 +134,8 @@ func (t *Tuner) WaitForLock() (err error) {
 	return
 }
 
-func (t *Tuner) Tune(channel Channel) error {
-	_, err := t.SetTuner("channel", fmt.Sprintf("%s:%d", channel.Modulation, channel.Frequency))
+func (t *Tuner) Tune(modulation string, frequency int) error {
+	_, err := t.SetTuner("channel", fmt.Sprintf("%s:%d", modulation, frequency))
 	return err
 }
 
@@ -144,7 +144,7 @@ func (t *Tuner) StreamInfo() (TagValue, error) {
 }
 
 func (t *Tuner) Scan() chan Channel {
-	visited := make(map[uint32]bool)
+	visited := make(map[int]bool)
 
 	ch := make(chan Channel)
 	go func() {
@@ -155,7 +155,7 @@ func (t *Tuner) Scan() chan Channel {
 					continue
 				}
 				visited[channel.Frequency] = true
-				t.Tune(channel)
+				t.Tune(channel.Modulation, channel.Frequency)
 				err := t.WaitForLock()
 				if err != nil {
 					if err != ErrTimeout && err != ErrNoSignal {

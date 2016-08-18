@@ -277,12 +277,12 @@ func TestChannelMapChannels(t *testing.T) {
 		Channel{158, 999000000, "auto", "158", -1, -1, nil},
 	}
 
-	expected := make(map[uint32]Channel)
+	expected := make(map[int]Channel)
 	for _, channel := range channels {
 		expected[channel.Frequency] = channel
 	}
 
-	received := make(map[uint32]Channel)
+	received := make(map[int]Channel)
 	for channel := range Channels("us-cable") {
 		received[channel.Frequency] = channel
 	}

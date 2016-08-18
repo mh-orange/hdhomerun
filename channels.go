@@ -107,7 +107,7 @@ type ProgramList []Program
 
 type Channel struct {
 	Number     int
-	Frequency  uint32
+	Frequency  int
 	Modulation string
 	Name       string
 	TSID       int
@@ -162,18 +162,18 @@ func (c *Channel) ONIDDetected() bool {
 type channelRange struct {
 	Start     int
 	End       int
-	Frequency uint32
-	Spacing   uint32
+	Frequency int
+	Spacing   int
 }
 
 type channelMap []channelRange
 
-func channelFrequencyRound(frequency, resolution uint32) uint32 {
+func channelFrequencyRound(frequency, resolution int) int {
 	frequency += resolution / 2
 	return (frequency / resolution) * resolution
 }
 
-func channelFrequencyRoundNormal(frequency uint32) uint32 {
+func channelFrequencyRoundNormal(frequency int) int {
 	return channelFrequencyRound(frequency, 125000)
 }
 
@@ -191,7 +191,7 @@ func (cr channelRange) channels(txCh chan Channel) {
 	for i := cr.Start; i <= cr.End; i++ {
 		txCh <- Channel{
 			Number:     i,
-			Frequency:  channelFrequencyRoundNormal(cr.Frequency + (uint32(i-cr.Start) * cr.Spacing)),
+			Frequency:  channelFrequencyRoundNormal(cr.Frequency + ((i - cr.Start) * cr.Spacing)),
 			Modulation: "auto",
 			Name:       fmt.Sprintf("%d", i),
 			TSID:       -1,
