@@ -5,9 +5,8 @@ import (
 )
 
 var (
-	ErrTimeout          = fmt.Errorf("Timeout")
-	ErrNoSignal         = fmt.Errorf("Signal Strength Too Low")
-	ErrLockNotSupported = fmt.Errorf("Channel Lock is not Supported")
+	ErrTimeout  = fmt.Errorf("Timeout")
+	ErrNoSignal = fmt.Errorf("Signal Strength Too Low")
 )
 
 type ErrParseError string

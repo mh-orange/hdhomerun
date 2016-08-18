@@ -28,6 +28,13 @@ func newTestDevice() *Device {
 
 }
 
+func TestDefaultAddr(t *testing.T) {
+	d := newTestDevice()
+	if d.Addr() != nil {
+		t.Errorf("Expected nil addr but got %v", d.Addr())
+	}
+}
+
 func TestGetSet(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -88,19 +95,6 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
-func TestTuner(t *testing.T) {
-	// this is almost ridiculous
-	d := newTestDevice()
-	tuner := d.Tuner(1)
-	if tuner.n != 1 {
-		t.Errorf("Expected tuner number to be 1 but got %d", tuner.n)
-	}
-
-	if tuner.d != d {
-		t.Errorf("Expected device to be %v but got %v", d, tuner.d)
-	}
-}
-
 func TestDiscover(t *testing.T) {
 	tests := []struct {
 		reply   testPacket
@@ -144,6 +138,10 @@ func TestDiscover(t *testing.T) {
 				continue
 			}
 			devices = append(devices, result.Device.ID())
+
+			if result.Device.Addr().String() != "127.0.0.1:65001" {
+				t.Errorf("Expected adress 127.0.0.1:65001 but got %s", result.Device.Addr().String())
+			}
 		}
 
 		if !reflect.DeepEqual(devices, test.devices) {

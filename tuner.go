@@ -9,7 +9,7 @@ import (
 type TunerStatus struct {
 	Channel              string
 	LockStr              string
-	LockSupported        bool
+	Lock                 bool
 	SignalStrength       int
 	SignalToNoiseQuality int
 	SymbolErrorQuality   int
@@ -64,7 +64,7 @@ func (ts *TunerStatus) UnmarshalText(text []byte) (err error) {
 
 	if err == nil {
 		if ts.LockStr != "none" {
-			ts.LockSupported = true
+			ts.Lock = true
 		}
 	}
 
@@ -117,11 +117,10 @@ func (t *Tuner) WaitForLock() (err error) {
 			break
 		}
 
-		if !status.SignalPresent() {
-			err = ErrNoSignal
+		if status.SignalPresent() && status.Lock {
 			break
-		} else if status.LockSupported {
-			err = ErrLockNotSupported
+		} else if !status.SignalPresent() {
+			err = ErrNoSignal
 			break
 		}
 
@@ -159,7 +158,7 @@ func (t *Tuner) Scan() chan Channel {
 				t.Tune(channel)
 				err := t.WaitForLock()
 				if err != nil {
-					if err != ErrLockNotSupported && err != ErrNoSignal {
+					if err != ErrTimeout && err != ErrNoSignal {
 						Logger.Printf("Error waiting for lock: %v", err)
 					}
 					continue

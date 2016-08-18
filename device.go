@@ -170,3 +170,10 @@ func (d *Device) Close() error {
 	}
 	return nil
 }
+
+func (d *Device) Addr() net.Addr {
+	if conn, ok := d.Connection.(Addressable); ok {
+		return conn.RemoteAddr()
+	}
+	return nil
+}
