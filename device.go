@@ -11,11 +11,17 @@ import (
 
 type Device struct {
 	Connection
-	id []byte
+}
+
+type DeviceID []byte
+
+func (d DeviceID) String() string {
+	return hex.EncodeToString(d)
 }
 
 type DiscoverResult struct {
 	Device *Device
+	ID     DeviceID
 	Err    error
 }
 
@@ -30,7 +36,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
-		ch <- DiscoverResult{nil, err}
+		ch <- DiscoverResult{nil, nil, err}
 		return ch
 	}
 
@@ -52,7 +58,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
 					continue
 				} else if err != io.EOF {
-					ch <- DiscoverResult{nil, err}
+					ch <- DiscoverResult{nil, nil, err}
 				}
 				break
 			}
@@ -61,7 +67,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 			p, err := decoder.Next()
 
 			if err != nil {
-				ch <- DiscoverResult{nil, err}
+				ch <- DiscoverResult{nil, nil, err}
 				break
 			}
 
@@ -71,7 +77,8 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 
 			if _, found := discovered[addr.String()]; !found {
 				ch <- DiscoverResult{
-					Device: NewDevice(NewTCPConnection(&net.TCPAddr{addr.IP, addr.Port, addr.Zone}), p.Tags[TagDeviceId].Value),
+					Device: NewDevice(NewTCPConnection(&net.TCPAddr{addr.IP, addr.Port, addr.Zone})),
+					ID:     DeviceID(p.Tags[TagDeviceId].Value),
 					Err:    nil,
 				}
 			}
@@ -97,7 +104,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 			}
 
 			if err != nil {
-				ch <- DiscoverResult{nil, err}
+				ch <- DiscoverResult{nil, nil, err}
 			}
 		}
 		wg.Done()
@@ -106,15 +113,15 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 	return ch
 }
 
-func NewDevice(conn Connection, id []byte) *Device {
-	return &Device{
-		Connection: conn,
-		id:         id,
-	}
+func Connect(ip net.IP, port int) (*Device, error) {
+	device := NewDevice(NewTCPConnection(&net.TCPAddr{ip, port, ""}))
+	return device, device.Connect()
 }
 
-func (d *Device) ID() string {
-	return hex.EncodeToString(d.id)
+func NewDevice(conn Connection) *Device {
+	return &Device{
+		Connection: conn,
+	}
 }
 
 func (d *Device) getset(name string, value *string) (resp TagValue, err error) {
