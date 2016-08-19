@@ -37,7 +37,7 @@ func TestTCPConnection(t *testing.T) {
 			wg.Done()
 		}()
 
-		d := NewDevice(NewTCPConnection(&net.TCPAddr{net.IP{127, 0, 0, 1}, 65001, ""}), []byte{1, 2, 3, 4})
+		d := NewDevice(NewTCPConnection(&net.TCPAddr{net.IP{127, 0, 0, 1}, 65001, ""}))
 		d.Connect()
 		for i, expectedRx := range test.rxPackets {
 			d.Send(test.txPackets[i])
