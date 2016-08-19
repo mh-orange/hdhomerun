@@ -22,7 +22,6 @@ func newTestConnection() *testConnection {
 
 func newTestDevice() *Device {
 	return &Device{
-		id:         []byte{0x01, 0x02, 0x03, 0x04},
 		Connection: newTestConnection(),
 	}
 
@@ -137,7 +136,7 @@ func TestDiscover(t *testing.T) {
 			if result.Err != nil {
 				continue
 			}
-			devices = append(devices, result.Device.ID())
+			devices = append(devices, result.ID.String())
 
 			if result.Device.Addr().String() != "127.0.0.1:65001" {
 				t.Errorf("Expected adress 127.0.0.1:65001 but got %s", result.Device.Addr().String())
