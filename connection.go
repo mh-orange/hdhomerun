@@ -56,9 +56,7 @@ func NewTCPConnection(addr *net.TCPAddr) *TCPConnection {
 
 func (conn *TCPConnection) Connect() (err error) {
 	conn.TCPConn, err = net.DialTCP("tcp", nil, conn.addr)
-	if err == nil {
-		conn.IOConnection = NewIOConnection(conn.TCPConn)
-	}
+	conn.IOConnection = NewIOConnection(conn.TCPConn)
 	return err
 }
 
