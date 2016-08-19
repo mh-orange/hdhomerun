@@ -45,7 +45,7 @@ func deviceFromId(id string) (*hdhomerun.Device, error) {
 		}
 
 		device := discoverResult.Device
-		if ip != nil || device.ID() == id {
+		if ip != nil || discoverResult.ID.String() == id {
 			device.Connect()
 			return device, nil
 		}
@@ -64,7 +64,7 @@ func main() {
 			if discoverResult.Err != nil {
 				fmt.Printf("Error during discovery: %v\n", discoverResult.Err)
 			} else {
-				fmt.Printf("hdhomerun device %s found at %s\n", discoverResult.Device.ID(), discoverResult.Device.Addr())
+				fmt.Printf("hdhomerun device %s found at %s\n", discoverResult.ID, discoverResult.Device.Addr())
 			}
 		}
 	} else {
@@ -98,7 +98,7 @@ func main() {
 		case "scan":
 			tuner := device.Tuner(0)
 			for channel := range tuner.Scan() {
-				fmt.Printf("Channel %d\n", channel.Frequency)
+				fmt.Printf("Channel %s:%d\n", channel.Modulation, channel.Frequency)
 				fmt.Printf("\tTSID: %d ONID: %d\n", channel.TSID, channel.ONID)
 				for _, program := range channel.Programs {
 					fmt.Printf("\t%s\n", program.Name)
