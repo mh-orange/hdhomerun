@@ -113,8 +113,8 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 	return ch
 }
 
-func Connect(ip net.IP, port int) (*Device, error) {
-	device := NewDevice(NewTCPConnection(&net.TCPAddr{ip, port, ""}))
+func Connect(addr *net.TCPAddr) (*Device, error) {
+	device := NewDevice(NewTCPConnection(addr))
 	return device, device.Connect()
 }
 
