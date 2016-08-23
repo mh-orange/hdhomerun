@@ -9,6 +9,10 @@ var (
 	ErrNoSignal = fmt.Errorf("Signal Strength Too Low")
 )
 
+type ErrCommunicationError struct {
+	ConnectionError error
+}
+
 type ErrParseError string
 
 func (e ErrParseError) Error() string {

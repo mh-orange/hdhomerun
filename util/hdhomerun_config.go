@@ -23,7 +23,7 @@ func usage() {
 	os.Exit(0)
 }
 
-func deviceFromId(id string) (*hdhomerun.Device, error) {
+func deviceFromId(id string) (hdhomerun.Device, error) {
 	var ip net.IP
 	if strings.Contains(id, ".") {
 		if strings.Contains(id, ":") {
@@ -46,7 +46,6 @@ func deviceFromId(id string) (*hdhomerun.Device, error) {
 
 		device := discoverResult.Device
 		if ip != nil || discoverResult.ID.String() == id {
-			device.Connect()
 			return device, nil
 		}
 	}
@@ -64,7 +63,7 @@ func main() {
 			if discoverResult.Err != nil {
 				fmt.Printf("Error during discovery: %v\n", discoverResult.Err)
 			} else {
-				fmt.Printf("hdhomerun device %s found at %s\n", discoverResult.ID, discoverResult.Device.Addr())
+				fmt.Printf("hdhomerun device %s found at %s\n", discoverResult.ID, discoverResult.Addr)
 			}
 		}
 	} else {

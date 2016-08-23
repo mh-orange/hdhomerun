@@ -2,6 +2,7 @@ package hdhomerun
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"time"
 )
@@ -76,11 +77,11 @@ func (ts *TunerStatus) SignalPresent() bool {
 }
 
 type Tuner struct {
-	d GetSetter
+	d Device
 	n int
 }
 
-func newTuner(d GetSetter, n int) *Tuner {
+func newTuner(d Device, n int) *Tuner {
 	return &Tuner{
 		d: d,
 		n: n,
@@ -198,4 +199,16 @@ func (t *Tuner) Scan() chan Channel {
 		close(ch)
 	}()
 	return ch
+}
+
+func (t *Tuner) Stream(frequency, program int, localAddr *net.UDPAddr) error {
+	_, err := t.SetTuner("channel", fmt.Sprintf("auto:%d", frequency))
+	if err == nil {
+		_, err = t.SetTuner("program", fmt.Sprintf("%d", program))
+	}
+
+	if err == nil {
+		_, err = t.SetTuner("target", fmt.Sprintf("udp://%s", localAddr.String()))
+	}
+	return err
 }

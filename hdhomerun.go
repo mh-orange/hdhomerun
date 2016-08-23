@@ -8,11 +8,6 @@ import (
 
 var Logger = log.New(os.Stderr, "HDHomerun", log.LstdFlags)
 
-type GetSetter interface {
-	Get(name string) (TagValue, error)
-	Set(name, value string) (TagValue, error)
-}
-
 func parseInt(str string) (int, error) {
 	i, err := strconv.ParseInt(str, 10, 0)
 	return int(i), err

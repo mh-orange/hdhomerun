@@ -99,14 +99,14 @@ func TestUnmarshalStatus(t *testing.T) {
 
 func TestStatus(t *testing.T) {
 	device := newTestDevice()
-	device.Send(statusRpy.p)
+	device.encoder.Encode(statusRpy.p)
 
 	tuner := device.Tuner(0)
 	_, err := tuner.Status()
 	if err != nil {
 		t.Errorf("Did not expect an error but got %v", err)
 	}
-	received, _ := device.Recv()
+	received, _ := device.decoder.Next()
 	if !reflect.DeepEqual(statusReq.p, received) {
 		t.Errorf("Expected request packet:\n%s\nGot:\n%s", statusReq.p.Dump(), received.Dump())
 	}
@@ -116,12 +116,12 @@ func newStatusRpy(signal int, lock string) TagValue {
 	return TagValue(fmt.Sprintf("ch=1 lock=%s ss=%d snq=90 seq=100 bps=38807712 pps=1", lock, signal))
 }
 
-type testGetSetter struct {
+type testTunerDevice struct {
 	sequence []TagValue
 	err      error
 }
 
-func (t *testGetSetter) Get(name string) (TagValue, error) {
+func (t *testTunerDevice) Get(name string) (TagValue, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
@@ -130,8 +130,12 @@ func (t *testGetSetter) Get(name string) (TagValue, error) {
 	return resp, nil
 }
 
-func (t *testGetSetter) Set(name, value string) (TagValue, error) {
+func (t *testTunerDevice) Set(name, value string) (TagValue, error) {
 	return nil, nil
+}
+
+func (t *testTunerDevice) Tuner(int) *Tuner {
+	return nil
 }
 
 func TestWaitForLock(t *testing.T) {
@@ -161,7 +165,7 @@ func TestWaitForLock(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tuner := newTuner(&testGetSetter{test.packetSequence, test.sendErr}, 0)
+		tuner := newTuner(&testTunerDevice{test.packetSequence, test.sendErr}, 0)
 		err := tuner.WaitForLock()
 		if err != test.expectedErr {
 			t.Errorf("Expected err %v but got %v", test.expectedErr, err)

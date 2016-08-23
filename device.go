@@ -9,19 +9,22 @@ import (
 	"time"
 )
 
-type Device struct {
-	Connection
-}
-
 type DeviceID []byte
 
 func (d DeviceID) String() string {
 	return hex.EncodeToString(d)
 }
 
+type Device interface {
+	Get(string) (TagValue, error)
+	Set(string, string) (TagValue, error)
+	Tuner(int) *Tuner
+}
+
 type DiscoverResult struct {
-	Device *Device
+	Device Device
 	ID     DeviceID
+	Addr   net.Addr
 	Err    error
 }
 
@@ -36,7 +39,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
-		ch <- DiscoverResult{nil, nil, err}
+		ch <- DiscoverResult{nil, nil, nil, err}
 		return ch
 	}
 
@@ -58,7 +61,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 				if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
 					continue
 				} else if err != io.EOF {
-					ch <- DiscoverResult{nil, nil, err}
+					ch <- DiscoverResult{nil, nil, nil, err}
 				}
 				break
 			}
@@ -67,7 +70,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 			p, err := decoder.Next()
 
 			if err != nil {
-				ch <- DiscoverResult{nil, nil, err}
+				ch <- DiscoverResult{nil, nil, nil, err}
 				break
 			}
 
@@ -77,7 +80,8 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 
 			if _, found := discovered[addr.String()]; !found {
 				ch <- DiscoverResult{
-					Device: NewDevice(NewTCPConnection(&net.TCPAddr{addr.IP, addr.Port, addr.Zone})),
+					Device: NewTCPDevice(&net.TCPAddr{addr.IP, addr.Port, addr.Zone}),
+					Addr:   addr,
 					ID:     DeviceID(p.Tags[TagDeviceId].Value),
 					Err:    nil,
 				}
@@ -104,7 +108,7 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 			}
 
 			if err != nil {
-				ch <- DiscoverResult{nil, nil, err}
+				ch <- DiscoverResult{nil, nil, nil, err}
 			}
 		}
 		wg.Done()
@@ -113,19 +117,43 @@ func Discover(ip net.IP, timeout time.Duration) chan DiscoverResult {
 	return ch
 }
 
-func Connect(addr *net.TCPAddr) (*Device, error) {
-	device := NewDevice(NewTCPConnection(addr))
-	return device, device.Connect()
+type TCPDevice struct {
+	*net.TCPConn
+	*GenericDevice
+	addr *net.TCPAddr
 }
 
-func NewDevice(conn Connection) *Device {
-	return &Device{
-		Connection: conn,
+func ConnectTCP(addr *net.TCPAddr) (d *TCPDevice, err error) {
+	d = NewTCPDevice(addr)
+	return d, d.connect()
+}
+
+func NewTCPDevice(addr *net.TCPAddr) *TCPDevice {
+	d := &TCPDevice{
+		addr: addr,
+	}
+	d.GenericDevice = NewGenericDevice(d)
+	return d
+}
+
+func (d *TCPDevice) connect() (err error) {
+	d.TCPConn, err = net.DialTCP("tcp", nil, d.addr)
+	return err
+}
+
+type GenericDevice struct {
+	encoder *Encoder
+	decoder *Decoder
+}
+
+func NewGenericDevice(rw io.ReadWriter) *GenericDevice {
+	return &GenericDevice{
+		encoder: NewEncoder(rw),
+		decoder: NewDecoder(rw),
 	}
 }
 
-func (d *Device) getset(name string, value *string) (resp TagValue, err error) {
-	err = d.Connect()
+func (d *GenericDevice) getset(name string, value *string) (resp TagValue, err error) {
 	tags := make(map[TagType]TagValue)
 	tags[TagGetSetName] = TagValue(name)
 
@@ -134,12 +162,12 @@ func (d *Device) getset(name string, value *string) (resp TagValue, err error) {
 	}
 
 	if err == nil {
-		err = d.Send(NewPacket(TypeGetSetReq, tags))
+		err = d.encoder.Encode(NewPacket(TypeGetSetReq, tags))
 	}
 
 	if err == nil {
 		var p *Packet
-		p, err = d.Recv()
+		p, err = d.decoder.Next()
 		if p.Type != TypeGetSetRpy {
 			err = wrongPacketType(TypeGetSetRpy, p.Type)
 		} else {
@@ -152,35 +180,14 @@ func (d *Device) getset(name string, value *string) (resp TagValue, err error) {
 	return
 }
 
-func (d *Device) Get(name string) (TagValue, error) {
+func (d *GenericDevice) Get(name string) (TagValue, error) {
 	return d.getset(name, nil)
 }
 
-func (d *Device) Set(name, value string) (TagValue, error) {
+func (d *GenericDevice) Set(name, value string) (TagValue, error) {
 	return d.getset(name, &value)
 }
 
-func (d *Device) Tuner(n int) *Tuner {
+func (d *GenericDevice) Tuner(n int) *Tuner {
 	return newTuner(d, n)
-}
-
-func (d *Device) Connect() error {
-	if conn, ok := d.Connection.(Connectable); ok {
-		return conn.Connect()
-	}
-	return nil
-}
-
-func (d *Device) Close() error {
-	if conn, ok := d.Connection.(Closeable); ok {
-		return conn.Close()
-	}
-	return nil
-}
-
-func (d *Device) Addr() net.Addr {
-	if conn, ok := d.Connection.(Addressable); ok {
-		return conn.RemoteAddr()
-	}
-	return nil
 }
