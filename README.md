@@ -51,7 +51,7 @@ import(
 )
 
 func main() {
-  device, _ := hdhomerun.Connect(&net.TCPAddr{net.IP{192,168,1,100}, 65001, ""})
+  device, _ := hdhomerun.ConnectTCP(&net.TCPAddr{net.IP{192,168,1,100}, 65001, ""})
   tuner := device.Tuner(0)
   tuner.Tune("auto", 177000000)
 }
@@ -68,7 +68,7 @@ import(
 )
 
 func main() {
-  device, _ := hdhomerun.Connect(net.IP{192,168,1,100}, 65001)
+  device, _ := hdhomerun.ConnectTCP(&net.TCPAddr{net.IP{192,168,1,100}, 65001, ""})
   tuner := device.Tuner(0)
   for result := range tuner.Scan() {
     if result.Err != nil {
